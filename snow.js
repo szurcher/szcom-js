@@ -1,3 +1,9 @@
+/** Snow.js ***********************************************************
+ *
+ * Author: Stephen Zurcher <stephen.zurcher@gmail.com>
+ * License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
+ *
+ **********************************************************************/
 (function( window, undefined ) {
   var _sz = {};
 
@@ -29,6 +35,11 @@
   };
 
   _sz.sinMotion = function(value, height, waveLength) {
+    if( waveLength === 0 || value === undefined ||
+       height === undefined || waveLength === undefined ) {
+      return 0; // linear motion fallback
+    }
+    
     return height * Math.sin((2 * Math.PI / waveLength) * value);
   };
 

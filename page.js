@@ -1,10 +1,10 @@
 (function( $ ) {
   $(document).ready(function() {
     // init fireworks anim
-    window.sz.fireworks.init($('canvas.fw:not(.buffer)').get(0).getContext('2d'));
+//    window.sz.fireworks.init($('canvas.fw:not(.buffer)').get(0).getContext('2d'));
 
     // init snow anim
-//    window.sz.snow.initAnimation($('canvas.snow:not(.buffer)').get(0).getContext('2d'));
+    window.sz.snow.initAnimation($('canvas.snow:not(.buffer)').get(0).getContext('2d'));
 
     // activate tooltip.js on rel=tooltip
     $('[data-smz-tooltip=show]').tooltip();
@@ -56,22 +56,7 @@
 
     // then make sure they are accessible above any canvas masks
     $('a[href], #email-button').css('z-index', 99999);
-
-    // add invisible duplicate navbar to overcome canvas mask issues in a cheap way
-    $('.navbar').clone().addClass('cloned').css({
-      'opacity': '0',
-      'z-index': '99999'
-    }).insertBefore('.navbar');
-
-    // copy button click to trigger panel show/hide
-    $('.navbar.cloned button.navbar-toggle').click(function(evt) {
-      var forwardEvent = new $.Event('click');
-
-      forwardEvent.pageX = evt.pageX;
-      forwardEvent.pageY = evt.pageY;
-
-      $('.navbar:not(.cloned) button.navbar-toggle').trigger(forwardEvent);
-    });
+    $('nav').css('z-index', 999999);
 
     // handle contact form submit
     $('#contact').submit(function() {
