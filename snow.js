@@ -25,12 +25,12 @@
     return Math.floor(Math.random() * (max - min + 1) + min);
   };
 
-  _sz.renderToCanvas = function(object, renderFunction) {
+  _sz.renderDropToCanvas = function(obj, renderFunction) {
     var $buffer = jQuery('canvas.snow.buffer');
 
     if( $buffer.length ) {
       var buffer = $buffer.get(0);
-      renderFunction(object, buffer.getContext('2d'));
+      renderFunction(obj, buffer.getContext('2d'));
     }
   };
 
@@ -149,9 +149,9 @@
   };
 
   _sz.snow.SnowDrop.prototype._redraw = function() {
-    _sz.renderToCanvas(this, function(object, ctx) {
+    _sz.renderDropToCanvas(this, function(obj, ctx) {
       ctx.beginPath();
-      ctx.arc(object.x, object.y, object.radius, 0, 2*Math.PI,false);
+      ctx.arc(obj.x, obj.y, obj.radius, 0, 2*Math.PI,false);
       ctx.closePath();
       ctx.fillStyle = '#fefefe';
       ctx.shadowColor = '#ccc';
