@@ -4,7 +4,7 @@
 //    window.sz.fireworks.init($('canvas.fw:not(.buffer)').get(0).getContext('2d'));
 
     // init snow anim
-    window.sz.snow.initAnimation($('canvas.snow:not(.buffer)').get(0).getContext('2d'));
+//    window.sz.snow.initAnimation($('canvas.snow:not(.buffer)').get(0).getContext('2d'));
 
     // activate tooltip.js on rel=tooltip
     $('[data-smz-tooltip=show]').tooltip();
