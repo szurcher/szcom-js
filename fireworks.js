@@ -114,6 +114,61 @@
       '231,216,88,', //'yellow',
     ],
 
+    setup: function() {
+      // create and attach canvas and default off-screen buffer
+      var $b = $('body');
+      var $c = $('<canvas>')
+        .addClass('fw')
+        .appendTo($b)
+        .width($b.width())
+        .height($b.height())
+        .css('position', 'fixed')
+        .css('left', '0')
+        .css('top', '-10px')
+//        .css('pointer-events', 'none')
+        .css('z-index', '9999');
+
+      var $buf = $('<canvas>')
+        .addClass('buffer')
+        .addClass('fw')
+        .appendTo($b)
+        .width($b.width())
+        .height($b.height())
+        .css('position', 'fixed')
+        .css('left', '-100%')
+        .css('top', '-10px')
+        .css('z-index', '1');
+
+      var c = $c.get(0);
+      c.width = $b.width();
+      c.height = $b.height();
+
+      var buf = $buf.get(0);
+      buf.width = c.width;
+      buf.height = c.height;
+
+      // resize canvas to match screen
+      $(window).on('resize', function(eventObject) {
+        var $b = $('body');
+        var $c = $('canvas.fw:not(.buffer)');
+        var $buf = $('canvas.fw.buffer');
+        var c = $c.get(0);
+        var buf = $buf.get(0);
+
+        if( $c.length ) {
+          $c.width($b.width()).height($b.height());
+          c.width = $b.width();
+          c.height = $b.height();
+        }
+
+        if( $buf.length ) {
+          $buf.width(c.width).height(c.height);
+          buf.width = c.width;
+          buf.height = c.height;
+        }
+      });
+    },
+
     // initialize and run fireworks animation
     // -- context - main canvas 2d context
     init: function(context) {
@@ -376,59 +431,7 @@
   window.sz = _sz;
 
   (function($) {
-    // create and attach canvas and default off-screen buffer
-    var $b = $('body');
-    var $c = $('<canvas>')
-      .addClass('fw')
-      .appendTo($b)
-      .width($b.width())
-      .height($b.height())
-      .css('position', 'fixed')
-      .css('left', '0')
-      .css('top', '-10px')
-//              .css('pointer-events', 'none')
-      .css('z-index', '9999');
-
-    var $buf = $('<canvas>')
-      .addClass('buffer')
-      .addClass('fw')
-      .appendTo($b)
-      .width($b.width())
-      .height($b.height())
-      .css('position', 'fixed')
-      .css('left', '-100%')
-      .css('top', '-10px')
-      .css('z-index', '1');
-
-    var c = $c.get(0);
-    c.width = $b.width();
-    c.height = $b.height();
-
-    var buf = $buf.get(0);
-    buf.width = c.width;
-    buf.height = c.height;
-
-    // resize canvas to match screen
-    $(window).on('resize', function(eventObject) {
-      var $b = $('body');
-      var $c = $('canvas.fw:not(.buffer)');
-      var $buf = $('canvas.fw.buffer');
-      var c = $c.get(0);
-      var buf = $buf.get(0);
-
-      if( $c.length ) {
-        $c.width($b.width()).height($b.height());
-        c.width = $b.width();
-        c.height = $b.height();
-      }
-
-      if( $buf.length ) {
-        $buf.width(c.width).height(c.height);
-        buf.width = c.width;
-        buf.height = c.height;
-      }
-    });
-
+//    sz.fireworks.setup();
     // start animation
 //    $(document).ready(function() {
 //      sz.fireworks.init(c.getContext('2d'));

@@ -61,6 +61,61 @@
 
     snow: [],
 
+    init: function() {
+      var $b = $('body');
+      var $c = $('<canvas>')
+                .addClass('snow')
+                .appendTo($b)
+                .width($b.width())
+                .height($b.height())
+                .css('position', 'fixed')
+                .css('left', '0')
+                .css('top', '-10px')
+/*              .css('pointer-events', 'none')*/
+                .css('z-index', '9999');
+
+      var $buf = $('canvas.snow.buffer');
+
+      if( $buf.length === 0 ) {
+        $buf = $('<canvas>')
+                  .addClass('buffer')
+                  .addClass('snow')
+                  .appendTo($b)
+                  .width($b.width())
+                  .height($b.height())
+                  .css('position', 'fixed')
+                  .css('left', '-100%')
+                  .css('top', '-10px')
+                  .css('z-index', '1');
+      }
+
+      var c = $c.get(0);
+      c.width = $b.width();
+      c.height = $b.height();
+
+      var buf = $buf.get(0);
+      buf.width = $b.width();
+      buf.height = $b.height();
+
+      $(window).on('resize', function (eventObject) {
+        var $b = $('body');
+        var $c = $('canvas.snow:not(.buffer)');
+        var $buf = $('canvas.snow.buffer');
+
+        if( $c.length ) {
+          $c.width($b.width()).height($b.height());
+          $c.get(0).width = $b.width();
+          $c.get(0).height = $b.height();
+        }
+
+        if( $buf.length ) {
+          $buf.width($b.width()).height($b.height());
+          $buf.get(0).width = $b.width();
+          $buf.get(0).height = $b.height();
+        }
+      });
+    },
+
     initAnimation: function(context) {
       var i = 0;
       if( _sz.snow.snow.length === 0 ) {
@@ -176,59 +231,7 @@
   window.sz = _sz;
 
   (function($) {
-    var $b = $('body');
-    var $c = $('<canvas>')
-              .addClass('snow')
-              .appendTo($b)
-              .width($b.width())
-              .height($b.height())
-              .css('position', 'fixed')
-              .css('left', '0')
-              .css('top', '-10px')
-/*            .css('pointer-events', 'none')*/
-              .css('z-index', '9999');
-
-    var $buf = $('canvas.snow.buffer');
-
-    if( $buf.length === 0 ) {
-      $buf = $('<canvas>')
-        .addClass('buffer')
-        .addClass('snow')
-        .appendTo($b)
-        .width($b.width())
-        .height($b.height())
-        .css('position', 'fixed')
-        .css('left', '-100%')
-        .css('top', '-10px')
-        .css('z-index', '1');
-    }
-
-    var c = $c.get(0);
-    c.width = $b.width();
-    c.height = $b.height();
-
-    var buf = $buf.get(0);
-    buf.width = $b.width();
-    buf.height = $b.height();
-
-    $(window).on('resize', function (eventObject) {
-      var $b = $('body');
-      var $c = $('canvas.snow:not(.buffer)');
-      var $buf = $('canvas.snow.buffer');
-
-      if( $c.length ) {
-        $c.width($b.width()).height($b.height());
-        $c.get(0).width = $b.width();
-        $c.get(0).height = $b.height();
-      }
-
-      if( $buf.length ) {
-        $buf.width($b.width()).height($b.height());
-        $buf.get(0).width = $b.width();
-        $buf.get(0).height = $b.height();
-      }
-    });
-
+//    _sz.snow.init();
 //    $(document).ready(function() {
 //      _sz.snow.initAnimation(c.getContext('2d'));
 //    });
