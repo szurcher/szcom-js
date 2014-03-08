@@ -55,14 +55,14 @@
     });
 
     // then make sure they are accessible above any canvas masks
-    $('a[href], #email-button').css('z-index', 99999);
+//    $('a[href], #email-button').css('z-index', 99999);
     $('nav').css('z-index', 999999);
 
     // handle contact form submit
     $('#contact').submit(function() {
       $('#contact .modal-footer button[type="submit"]').attr('disabled', 'disabled');
       $('#form-processing').show();
-      $.post("php/mail.php", $(this).serialize())
+      $.post("[TODO: choose url]", $(this).serialize())
        .done(function(result, textStatus, jqXHR) {
          $('#contact .modal-footer button[type="submit"]').removeAttr('disabled');
          $('#form-processing').hide();
