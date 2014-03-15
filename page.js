@@ -1,10 +1,32 @@
 (function( $ ) {
+  var csrfToken = $.cookie('csrftoken');
+
+  function csrfSafeMethod(method) {
+    // HTTPD methods that do not require a CSRF token header
+    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+  }
+
+  $.ajaxSetup({
+    crossDomain: false, // prevent cross domain requests
+    beforeSend: function(xhr, settings) {
+      if( !csrfSafeMethod(settings.type)) {
+        xhr.setRequestHeader("X-CSRFToken", csrfToken);
+      }
+    },
+    jsonp: null,
+    jsonpCallback: null
+  });
+
   $(document).ready(function() {
     // init fireworks anim
-//    window.sz.fireworks.init($('canvas.fw:not(.buffer)').get(0).getContext('2d'));
+//    window.sz.fireworks.init(
+//      $('canvas.fw:not(.buffer)').get(0).getContext('2d')
+//    );
 
     // init snow anim
-//    window.sz.snow.initAnimation($('canvas.snow:not(.buffer)').get(0).getContext('2d'));
+//    window.sz.snow.initAnimation(
+//      $('canvas.snow:not(.buffer)').get(0).getContext('2d')
+//    );
 
     // activate tooltip.js on rel=tooltip
     $('[data-smz-tooltip=show]').tooltip();
@@ -17,14 +39,21 @@
     // handle nav image toggle
     $('button.navbar-toggle').on("click", function() {
       if( $('.navbar-collapse').hasClass('collapse') ) { 
-        $(this).children('span.glyphicon').addClass('glyphicon-chevron-up').removeClass('glyphicon-chevron-down');
+        $(this)
+          .children('span.glyphicon')
+          .addClass('glyphicon-chevron-up')
+          .removeClass('glyphicon-chevron-down');
       }
       else {
-        $(this).children('span.glyphicon').addClass('glyphicon-chevron-down').removeClass('glyphicon-chevron-up');
+        $(this)
+          .children('span.glyphicon')
+          .addClass('glyphicon-chevron-down')
+          .removeClass('glyphicon-chevron-up');
       }
     });
 
-    // check for links that have a position: relative but no top/left attribute (or have auto)
+    // check for links that have a position:
+    // relative but no top/left attribute (or have auto)
     $('a[href], #email-button').not(function(idx) {
       var $this = $(this);
       var top = $this.css('top');
@@ -59,39 +88,67 @@
     $('nav').css('z-index', 999999);
 
     // handle contact form submit
-    $('#contact').submit(function() {
-      $('#contact .modal-footer button[type="submit"]').attr('disabled', 'disabled');
+    $('#contact').submit(function(event) {
+      event.preventDefault();
+
+      $('#contact .modal-footer button[type="submit"]').attr(
+        'disabled', 'disabled'
+      );
       $('#form-processing').show();
-      $.post("[TODO: choose url]", $(this).serialize())
+
+      $.ajax({
+        type: "POST",
+        url: "http://" + location.host + "/ajax/send/",
+        data: $(this).serialize(),
+        dataType: "json"
+      })
        .done(function(result, textStatus, jqXHR) {
-         $('#contact .modal-footer button[type="submit"]').removeAttr('disabled');
+         $('#contact .modal-footer button[type="submit"]')
+           .removeAttr('disabled');
          $('#form-processing').hide();
          // handle success
-         $('#contact').modal('hide');
+         $('#contact-modal').modal('hide');
          if( parseInt(result.result, 10) === 0 ) {
           $('<div>')
             .addClass('alert')
-            .addClass('alert-error')
+            .addClass('alert-danger')
             .addClass('send-error')
-            .append('<button type="button" class="close" data-dismiss="alert">x</button>')
-            .append('An error occurred while attempting to send the contact message. Please try again or contact me through LinkedIn. I apologize for the trouble.')
+            .append('<button type="button" class="close"' +
+                    'data-dismiss="alert">x</button>')
+            .append('<i class="fa fa-exclamation-circle"></i> ' +
+                    'An error occurred while attempting to send the contact' +
+                    'message. Please try again or contact me through' +
+                    'LinkedIn. I apologize for the trouble.')
             .prependTo('#messages');
          }
          else {
           $('<div>')
             .addClass('alert')
-            .addClass('alert-info')
+            .addClass('alert-success')
             .addClass('send-info')
-            .append('<button type="button" class="close" data-dismiss="alert">x</button>')
-            .append('E-mail sent successfully! Thank you for contacting me.')
+            .append('<button type="button" class="close"' +
+                    'data-dismiss="alert">x</button>')
+            .append('<i class="fa fa-info-circle"></i> E-mail sent ' +
+                    'successfully! Thank you for contacting me.')
             .prependTo('#messages');
          }
        })
        .fail(function(jqXHR, textStatus, errorThrown) {
-         $('#contact .modal-footer button[type="submit"]').removeAttr('disabled');
+         $('#contact .modal-footer button[type="submit"]')
+           .removeAttr('disabled');
          $('#form-processing').hide();
          // handle error
-         alert("jquery error, " + textStatus + ", " + jqXHR.responseText);
+         $('#contact-modal').modal('hide');
+         $('<div>')
+           .addClass('alert')
+           .addClass('alert-danger')
+           .addClass('send-error')
+           .append('<button type="button" class="close"' +
+                   'data-dismiss="alert">x</button>')
+           .append('<i class="fa fa-exclamation-circle"></i> An error ' +
+                   'occurred while communicating with the server.' +
+                   ' The server provided the following information:<br>' +
+                   textStatus + ', ' + jqXHR.responseText);
        });
 
       return false;
