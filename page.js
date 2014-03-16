@@ -117,8 +117,8 @@
                     'data-dismiss="alert">x</button>')
             .append('<i class="fa fa-exclamation-circle"></i> ' +
                     'An error occurred while attempting to send the contact' +
-                    'message. Please try again or contact me through' +
-                    'LinkedIn. I apologize for the trouble.')
+                    ' message. Please try again or contact me through' +
+                    ' LinkedIn. I apologize for the trouble.')
             .prependTo('#messages');
          }
          else {
