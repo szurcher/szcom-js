@@ -40,111 +40,28 @@
 
   // define ptest
   _sz.ptest = {
-    '_MIN_SPEED': 100, // pixels (per second)
-    '_MAX_SPEED': 1000,
+    '_MIN_SPEED': 250, // pixels (per second)
+    '_MAX_SPEED': 350,
 
     'elClass': 'ptest',
+    'mainCanvas': null,
     'animObjects': [],
 
     'animate': null, // animation loop function
-    'getBuffer': null, // return buffer canvas object
-    'getTmpBuffer': null, // return new canvas object
-    'getOrCreateBuffer': null, // return buffer canvas object (create if necc.)
-    'renderToCanvas': null, // update canvas with new data
     'Firefly': null // canvas graphic object
   };
 
-  _sz.ptest.animate = function(context) {
-    var that = this,  // set up closure for callbacks
-        i,
-        $buf = this.getBuffer();
-
-    for(i = 0;i < this.animObjects.length;i++) {
-      this.animObjects[i]._update();
-    }
-
-    if( $buf.length ) {
-      context.save();
-      context.globalCompositeOperation = 'copy';
-      context.drawImage($buf.get(0), 0, 0);
-      context.restore();
-    }
-
-    // loop
-    setTimeout(function() {
-      for(var i = 0;i < sz.ptest.animObjects.length;i++) {
-        sz.ptest.animObjects[i].startTime += 250; // adjust time for timeout delay
-      }
-      requestAnimFrame(function() {
-        sz.ptest.animate(context);
-      });
-    }, 250);
-  };
-
-  _sz.ptest.getBuffer = function() {
-    return jQuery('.' + this.elClass + '.buffer');
-  };
-
-  _sz.ptest.getTmpBuffer = function(w,h) {
-    var $b = jQuery('body'),
-        width = w || $b.width(),
-        height = h || $b.height();
-    
-    $buf = jQuery('<canvas>').width(width).height(height);
-    $buf.get(0).width = width;
-    $buf.get(0).height = height;
-    
-    return $buf;
-  };
-
-  _sz.ptest.getOrCreateBuffer = function(w,h) {
-    var $buf = this.getBuffer();
-
-    if( $buf.length === 0 ) {
-      var $b = jQuery('body');
-
-      var width = w || $b.width(),
-          height = h || $b.height(),
-
-          cssOpts = {
-            'position': 'fixed',
-            'left': '-100%',
-            'top': '0',
-            'z-index': '1'
-          };
-
-      $buf = jQuery('<canvas>')
-        .addClass('buffer')
-        .addClass(this.elClass)
-        .appendTo($b)
-        .width(width)
-        .height(height)
-        .css(cssOpts);
-
-      $buf.get(0).width = width;
-      $buf.get(0).height = height;
-    }
-    else if( w !== undefined && h !== undefined ) {
-      $buf.width(w);
-      $buf.height(h);
-      $buf.get(0).width = w;
-      $buf.get(0).height = h;
-    }
-
-    return $buf;
-  };
-  
-  _sz.ptest.renderToCanvas = function(renderFunction) {
-    $buf = this.getOrCreateBuffer();
-
-    if( $buf.length ) {
-      renderFunction($buf.get(0).getContext('2d'));
+  _sz.ptest.animate = function() {
+    for(i = 0;i < _sz.ptest.animObjects.length;i++) {
+      _sz.ptest.animObjects[i]._update();
     }
   };
 
   _sz.ptest.Firefly = function() {
     this.gRI = _sz.getRandomInt;
     this.parent = _sz.ptest;
+    this._min_wait = this.gRI(350, 750);
+    this._max_wait = this.gRI(1500, 2500);
 
     this.animate = false;
     this.parent.animObjects.push(this);
@@ -153,24 +70,33 @@
 
   _sz.ptest.Firefly.prototype.flySize = 2;
 
-  _sz.ptest.Firefly.prototype.refContext = (function(func) {
+  _sz.ptest.Firefly.prototype.refCanvas = (function(func) {
     var size = func.prototype.flySize,
-        tmpBuf = _sz.ptest.getTmpBuffer(size*4,size*4);
-    tmpBuf = tmpBuf.get(0);
-    var tbCtx = tmpBuf.getContext('2d');
+      refCnvs = new _sz.Canvas({
+        'width': size*4,
+        'height': size*4,
+        'cssWidth': (size*4) + 'px',
+        'cssHeight': (size*4) + 'px'
+      });
 
-    tbCtx.fillStyle = 'red';
-//    tbCtx.fillStyle = 'rgb(166,166,255)';
-//    tbCtx.fillStyle = 'rgb(160,160,160)';
-    tbCtx.shadowColor = tbCtx.fillStyle;
-    tbCtx.shadowBlur = size*2;
-    tbCtx.shadowOffsetX = tbCtx.shadowOffsetY = 0;
-    tbCtx.beginPath();
-    tbCtx.arc(size*2, size*2, size, 0, 2*Math.PI, false);
-    tbCtx.closePath();
-    tbCtx.fill();
+    refCnvs.render(function(context) {
+      context.save();
+      context.beginPath();
+      context.fillStyle = 'white';
+//      context.fillStyle = 'rgb(166,166,255)';
+//      context.fillStyle = 'rgb(160,160,160)';
+//      context.shadowColor = context.fillStyle;
+//      context.shadowBlur = size*2;
+//      context.shadowOffsetX = context.shadowOffsetY = 0;
+//      context.beginPath();
+//      context.arc(size*2, size*2, size, 0, 2*Math.PI, false);
+//      context.closePath();
+      context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+      context.closePath();
+      context.restore();
+    });
 
-    return tbCtx;
+    return refCnvs;
   })(_sz.ptest.Firefly);
 
   _sz.ptest.Firefly.prototype._directions = [
@@ -185,11 +111,11 @@
   ];
 
   _sz.ptest.Firefly.prototype._init = function() {
-    var $buf = this.parent.getBuffer();
+    var cnvs = this.parent.mainCanvas;
 
-    if( $buf.length ) {
-      this.max_x = $buf.width();
-      this.max_y = $buf.height();
+    if( cnvs !== undefined ) {
+      this.max_x = cnvs.width();
+      this.max_y = cnvs.height();
       this.x = this.startX = this.old_x = this.gRI(0, this.max_x);
       this.y = this.startY = this.old_y = this.gRI(0, this.max_y);
 
@@ -197,92 +123,90 @@
       this.direction = this.gRI(0, this._directions.length - 1);
 
       this.startTime = Date.now();
+      this.prevTime = this.startTime;
       this.time = null;
     }
   };
 
   _sz.ptest.Firefly.prototype._set_position = function() {
+    var changeX = Math.floor((this.speed*this._directions[this.direction][0]) * ((this.time-this.prevTime)/1000));
+    var changeY = Math.floor((this.speed*this._directions[this.direction][1]) * ((this.time-this.prevTime)/1000));
+
     this.old_x = this.x;
     this.old_y = this.y;
-    this.x = this.startX + Math.floor((this.speed * this._directions[this.direction][0]) * (this.time/1000));
-    this.y = this.startY + Math.floor((this.speed * this._directions[this.direction][1]) * (this.time / 1000));
+    this.x += changeX;
+    this.y += changeY;
   };
 
   _sz.ptest.Firefly.prototype._update = function() {
+    var that = this;
     if(this.animate) {
+      this.prevTime = this.time;
       this.time = Date.now() - this.startTime;
 
-      this._set_position();
-      if( this.x > this.max_x || this.x < 0 || this.y > this.max_y || this.y < 0 ) {
-        this._init(); // out of bounds, do reset
+      if( Math.floor(this.time % 30) === 0 ) {
+        var newDir = this.direction;
+        var opts = null;
+        switch(this.direction) {
+          case 0:
+            opts = [0, 4, 5];
+            break;
+          case 4:
+            opts = [0, 2, 4];
+            break;
+          case 5:
+            opts = [0, 3, 5];
+            break;
+          case 1:
+            opts = [1, 6, 7];
+            break;
+          case 6:
+            opts = [1, 2, 6];
+            break;
+          case 7:
+            opts = [1, 3, 7];
+            break;
+          case 2:
+            opts = [2, 4, 6];
+            break;
+          case 3:
+            opts = [3, 5, 7];
+            break;
+        }
+        this.direction = opts[this.gRI(0, opts.length - 1)];
       }
 
+      this._set_position();
+
       this._paint();
+
+      if( this.x > this.max_x || this.x < 0-this.refCanvas.width() || this.y > this.max_y || this.y < 0-this.refCanvas.height() ) {
+        this.animate = false;
+
+        var wait = this.gRI(this._min_wait, this._max_wait);
+        setTimeout(function() {
+          that._init(); // out of bounds, do reset
+          that.animate = true;
+        }, wait);
+      }
     }
   };
 
   _sz.ptest.Firefly.prototype._paint = function() {
     var that = this;
-    this.parent.renderToCanvas(function(ctx) {
+    this.parent.mainCanvas.render(function(ctx) {
       var obj = that;
       var i,
-          refWidth = obj.refContext.canvas.width, // stored img width
-          refHeight = obj.refContext.canvas.height, // stored img height
-          max_steps = 80, // alpha max which also controls iterations
+          refWidth = obj.refCanvas.width(), // stored img width
+          refHeight = obj.refCanvas.height(), // stored img height
           dir = obj._directions[obj.direction]; // array w/x and y direction indicators
 
-      // if distance moved is less than full length of trail, reduce
-      if( obj.x <= Math.abs(obj.startX + (max_steps*dir[0])) &&
-          obj.y <= Math.abs(obj.startY + (max_steps*dir[1])) ) {
-        max_steps = Math.abs(obj.x - obj.startX);
-        var tmp = Math.abs(obj.y - obj.startY);
-        if( tmp > max_steps ) { // use greater of the 2 dimensions
-          max_steps = tmp;
-        }
-      }
-
-          // intermediate drawing buffer
-      var buf = obj.parent.getTmpBuffer(refWidth+max_steps-1, refHeight+max_steps-1),
-          bufContext = buf.get(0).getContext('2d'),
-          buf_x = 0, // tmp buffer start x
-          buf_y = 0, // tmp buffer start y
-          clr_x = obj.old_x, // left-most point in prev rgn
-          clr_y = obj.old_y, // top-most point in prev rgn
-          draw_x = obj.x, // main buffer left x
-          draw_y = obj.y; // main buffer top y
-
-          
-      // clear previous region
-      if( dir[0] > 0 ) { // if motion is towards the right, adjust left point
-        clr_x -= max_steps;
-        buf_x = bufContext.canvas.width - refWidth;
-      }
-      if( dir[1] > 0 ) { // if motion is towards the bottom, adjust top point
-        clr_y -= max_steps;
-        buf_y = bufContext.canvas.height - refHeight;
-      }
-
       ctx.save();
-/*        ctx.clearRect(clr_x, clr_y, bufContext.canvas.width, bufContext.canvas.height);
-        bufContext.clearRect(0,0,bufContext.canvas.width,bufContext.canvas.height);
-*/
-      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      bufContext.clearRect(0, 0, bufContext.canvas.width, bufContext.canvas.height);
+      ctx.beginPath();
+      ctx.clearRect(obj.old_x, obj.old_y, refWidth, refHeight);
 
-        if( max_steps > 0 ) {
-          var normStep = Math.floor(100/max_steps); // normalized step value for alpha
-          for(i = max_steps;i > 0;i--) {
-            bufContext.globalAlpha = normStep*i/100; // from most opaque to transparent
-            bufContext.drawImage(obj.refContext.canvas, buf_x, buf_y);
-            buf_x += -1*dir[0];
-            buf_y += -1*dir[1];
-          }
-        }
-        else {
-          bufContext.drawImage(obj.refContext.canvas, buf_x, buf_y);
-        }
-        // copy to main buffer
-        ctx.drawImage(buf.get(0), draw_x, draw_y);
+      ctx.drawImage(obj.refCanvas.get2DContext().canvas, obj.x, obj.y, refWidth, refHeight);
+      ctx.closePath();
       ctx.restore();
     });
   };
@@ -304,26 +228,32 @@
 
       var $bg = jQuery('#bg');
       var w = $bg.width(),
-          h = $bg.outerHeight(),
-          $canvas = jQuery('<canvas>')
-                    .addClass(sz.ptest.elClass)
-                    .width(w)
-                    .height(h)
-                    .css({
-                      'z-index': '1',
-                      'position': 'absolute',
-                      'left': '0',
-                      'top': $bg.offset().top
-                    })
-                    .appendTo('body');
+        h = $bg.outerHeight(),
+        screen = new _sz.Canvas({
+          'width': w,
+          'height': h,
+          'cssWidth': $bg.css('width'),
+          'cssHeight': $bg.css('height')
+        });
 
-      $canvas.get(0).width = w;
-      $canvas.get(0).height = h;
+      screen.css({
+        'z-index': '1',
+        'position': 'absolute',
+        'left': '0',
+        'top': $bg.offset().top
+      });
+      screen.attach();
 
-      sz.ptest.getOrCreateBuffer(w, h); // init buffer
+      sz.ptest.mainCanvas = screen;
 
-      var test = new sz.ptest.Firefly();
-      sz.ptest.animate($canvas.get(0).getContext('2d'));
+      new sz.ptest.Firefly();
+      new sz.ptest.Firefly();
+
+      for(var i = 0; i < sz.ptest.animObjects.length; i++) {
+        sz.ptest.animObjects[i].animate = true;
+      }
+
+      sz.ptest.mainCanvas.animate(sz.ptest.animate);
     });
   })(jQuery);
 })(window);
