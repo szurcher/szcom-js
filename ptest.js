@@ -33,6 +33,14 @@
       };
   })();
 
+  // because
+  Number.prototype.times = Number.prototype.times || function(callback) {
+    for(var i = 0;i < this; i++) {
+      callback.call(this, i);
+    }
+    return this + 0;
+  };
+
   // make sure getRandomInt exists
   _sz.getRandomInt = _sz.getRandomInt || function(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min);
@@ -63,6 +71,7 @@
     this._min_wait = this.gRI(350, 750);
     this._max_wait = this.gRI(1500, 2500);
 
+    this.bounced = 0;
     this.animate = false;
     this.parent.animObjects.push(this);
     this._init();
@@ -81,18 +90,17 @@
 
     refCnvs.render(function(context) {
       context.save();
-      context.beginPath();
-      context.fillStyle = 'white';
-//      context.fillStyle = 'rgb(166,166,255)';
+//      context.fillStyle = 'white';
+      context.fillStyle = 'rgba(190,190,255,0.8)';
 //      context.fillStyle = 'rgb(160,160,160)';
-//      context.shadowColor = context.fillStyle;
-//      context.shadowBlur = size*2;
-//      context.shadowOffsetX = context.shadowOffsetY = 0;
-//      context.beginPath();
-//      context.arc(size*2, size*2, size, 0, 2*Math.PI, false);
-//      context.closePath();
-      context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+      context.shadowColor = context.fillStyle;
+      context.shadowBlur = size;
+      context.shadowOffsetX = context.shadowOffsetY = 0;
+      context.beginPath();
+      context.arc(size*2, size*2, size, 0, 2*Math.PI, false);
       context.closePath();
+//      context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+      context.fill();
       context.restore();
     });
 
@@ -104,10 +112,10 @@
     [1,0], // right
     [0,-1], // up
     [0,1], // down
-    [-1,-1], // diag left up
-    [-1,1], // diag left down
-    [1,-1], // diag right up
-    [1,1] // diag right down
+//    [-1,-1], // diag left up
+//    [-1,1], // diag left down
+//    [1,-1], // diag right up
+//    [1,1] // diag right down
   ];
 
   _sz.ptest.Firefly.prototype._init = function() {
@@ -125,6 +133,7 @@
       this.startTime = Date.now();
       this.prevTime = this.startTime;
       this.time = null;
+      this.bounced = 0;
     }
   };
 
@@ -144,36 +153,38 @@
       this.prevTime = this.time;
       this.time = Date.now() - this.startTime;
 
-      if( Math.floor(this.time % 30) === 0 ) {
+      if( this.bounced < 2 && this.time > 450 &&
+        Math.floor(this.time % this.gRI(10, 50)) === 0 ) {
         var newDir = this.direction;
         var opts = null;
         switch(this.direction) {
-          case 0:
-            opts = [0, 4, 5];
+          case 0: // left
+            opts = [0, 2, 3/*4, 5*/];
             break;
-          case 4:
-            opts = [0, 2, 4];
+ //         case 4: // diag left up
+ //           opts = [0, 2, 4];
+ //           break;
+ //         case 5: // diag left down
+ //           opts = [0, 3, 5];
+ //           break;
+          case 1: // right
+            opts = [1, 2, 3/*6, 7*/];
             break;
-          case 5:
-            opts = [0, 3, 5];
+ //         case 6: // diag right up
+ //           opts = [1, 2, 6];
+ //           break;
+ //         case 7: // diag right down
+ //           opts = [1, 3, 7];
+ //           break;
+          case 2: // up
+            opts = [2, 1, 0/*4, 6*/];
             break;
-          case 1:
-            opts = [1, 6, 7];
-            break;
-          case 6:
-            opts = [1, 2, 6];
-            break;
-          case 7:
-            opts = [1, 3, 7];
-            break;
-          case 2:
-            opts = [2, 4, 6];
-            break;
-          case 3:
-            opts = [3, 5, 7];
+          case 3: // down
+            opts = [3, 1, 0/*5, 7*/];
             break;
         }
         this.direction = opts[this.gRI(0, opts.length - 1)];
+        this.bounced++;
       }
 
       this._set_position();
@@ -217,7 +228,7 @@
     $(document).ready(function () {
       $(window, '#bg').on('resize', function(evt) {
         var $b = $('#bg'),
-            $c = $('canvas');
+          $c = $('canvas');
 
         $c.each(function(idx) {
           $(this).width($b.width()).height($b.outerHeight());
@@ -226,8 +237,9 @@
         });
       });
 
-      var $bg = jQuery('#bg');
-      var w = $bg.width(),
+      var $bg = jQuery('#bg'),
+        numParts = 10, // number of particles running concurrently
+        w = $bg.width(),
         h = $bg.outerHeight(),
         screen = new _sz.Canvas({
           'width': w,
@@ -246,8 +258,9 @@
 
       sz.ptest.mainCanvas = screen;
 
-      new sz.ptest.Firefly();
-      new sz.ptest.Firefly();
+      (numParts).times(function(i) {
+        new sz.ptest.Firefly();
+      });
 
       for(var i = 0; i < sz.ptest.animObjects.length; i++) {
         sz.ptest.animObjects[i].animate = true;
