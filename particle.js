@@ -60,17 +60,20 @@
   };
 
   _sz.particle.animate = function() {
-    for(i = 0;i < _sz.particle.animObjects.length;i++) {
-      _sz.particle.animObjects[i]._update();
-    }
+    _sz.particle.mainCanvas.render(function(ctx) {
+      for(i = 0;i < _sz.particle.animObjects.length;i++) {
+        _sz.particle.animObjects[i]._update(ctx);
+      }
+    });
   };
 
   _sz.particle.Firefly = function() {
     this.gRI = _sz.getRandomInt;
     this.parent = _sz.particle;
-    this._min_wait = this.gRI(350, 750);
-    this._max_wait = this.gRI(1500, 2500);
+    this._min_wait = this.gRI(0, 350);
+    this._max_wait = this.gRI(700, 1500);
 
+    this.scale_factor = 0;
     this.bounced = 0;
     this.accel = 0;
     this.animate = false;
@@ -153,6 +156,7 @@
       this.speed = this.gRI(this.parent._MIN_SPEED, this.parent._MAX_SPEED);
       this.accel = this.gRI(0, this._accelerators.length-1);
       this.direction = this.gRI(0, this._directions.length - 1);
+      this.scale_factor = 1 + (this.gRI(-33,33)/100);
 
       this.startTime = Date.now();
       this.prevTime = this.startTime;
@@ -166,8 +170,15 @@
   };
 
   _sz.particle.Firefly.prototype._set_position = function() {
-    var changeX = Math.floor((this.speed*this._directions[this.direction][0]) * ((this.time-this.prevTime)/1000));
-    var changeY = Math.floor((this.speed*this._directions[this.direction][1]) * ((this.time-this.prevTime)/1000));
+    var changeX = Math.floor((this.speed *
+      this.scale_factor *
+      this._directions[this.direction][0]) *
+      ((this.time-this.prevTime)/1000));
+
+    var changeY = Math.floor((this.speed *
+      this.scale_factor *
+      this._directions[this.direction][1]) *
+      ((this.time-this.prevTime)/1000));
 
     this._accelerate(changeX, changeY);
 //    this.speed += (changeX*changeX + changeY*changeY)/5;
@@ -180,7 +191,7 @@
     this.y += changeY;
   };
 
-  _sz.particle.Firefly.prototype._update = function() {
+  _sz.particle.Firefly.prototype._update = function(ctx) {
     var that = this;
     if(this.animate) {
       this.prevTime = this.time;
@@ -233,10 +244,7 @@
         this.y < 0-this.refCanvas.height() ) {
         this.animate = false;
 
-        this.parent.mainCanvas.render(function(ctx) {
-          var obj = that;
-          that._clear(ctx);
-        });
+        this._clear(ctx);
 
         var wait = this.gRI(this._min_wait, this._max_wait);
         setTimeout(function() {
@@ -245,7 +253,7 @@
         }, wait);
       }
       else {
-        this._paint();
+        this._paint(ctx);
       }
     }
   };
@@ -264,6 +272,9 @@
     }
 
     ctx.save();
+
+    ctx.scale(this.scale_factor, this.scale_factor);
+
     ctx.beginPath();
 
     var clearIt = function(x,y) {
@@ -323,10 +334,8 @@
     ctx.restore();
   };
 
-  _sz.particle.Firefly.prototype._paint = function() {
-    var that = this;
-    this.parent.mainCanvas.render(function(ctx) {
-      var obj = that;
+  _sz.particle.Firefly.prototype._paint = function(ctx) {
+      var obj = this;
       var i,
           refWidth = obj.refCanvas.width(), // stored img width
           refHeight = obj.refCanvas.height(), // stored img height
@@ -334,6 +343,9 @@
 
       obj._clear(ctx);
       ctx.save();
+
+      ctx.scale(obj.scale_factor, obj.scale_factor);
+
       ctx.globalAlpha = 0.1;
 
       var c = obj.refCanvas.get2DContext().canvas,
@@ -408,7 +420,6 @@
         }
       }
       ctx.restore();
-    });
   };
 
   sz.particle.load = function() {
