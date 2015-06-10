@@ -13,13 +13,23 @@
     return Math.floor(Math.random() * (max - min + 1) + min);
   };
 
-  // shim requestAnimFrame
-  window.requestAnimFrame = window.requestAnimFrame || (function(callback) {
+  // shim requestAnimFrame/cancelAnimFrame
+  window.requestAnimFrame = window.requestAnimFrame || (function() {
     return window.requestAnimationFrame || window.webkitRequestAnimationFrame ||
       window.mozRequestAnimationFrame || window.oRequestAnimationFrame ||
       window.msRequestAnimationFrame ||
       function(callback) {
-        window.setTimetout(callback, 1000/60);
+        return window.setTimeout(callback, 1000/60);
+      };
+  })();
+
+  window.cancelAnimFrame = window.cancelAnimFrame || (function() {
+    return window.cancelAnimationFrame || window.mozCancelAnimationFrame ||
+      window.webkitCancelAnimationFrame ||
+      window.webkit.CancelRequestAnimationFrame ||
+      window.oCancelAnimationFrame || window.msCancelAnimationFrame ||
+      function(id) {
+        window.clearTimeout(id);
       };
   })();
 
@@ -41,9 +51,13 @@
       'height': $doc.height(),
       'cssWidth': $doc.css('width'),
       'cssHeight': $doc.css('height'),
-      'parent': 'body'
+      'parent': 'body',
+      'szParent': 'body',
+      'runAnimation': false
     };
     this._canvas = null;
+
+    this._animReqId = false;
 
     jQuery.extend(this._opts, opts);
 
@@ -102,9 +116,17 @@
 
   /* sz.Canvas : attach - Attach canvas element to 'parent' element that must
    *  already exist in the document. 'parent' is set as an option when
-   *  a Canvas object is created, defaults to 'body'. */
+   *  a Canvas object is created, defaults to 'body'.
+   *
+   *  Returns the canvas object for call chaining */
   _sz.Canvas.prototype.attach = function() {
     this._canvas.appendTo(this._opts.parent);
+    return this;
+  };
+
+  _sz.Canvas.prototype.remove = function() {
+    this._canvas.remove();
+    return this;
   };
 
   /* sz.Canvas : get2DContext - Pass-through accessor for getContext('2d')
@@ -141,10 +163,44 @@
    *  frame */
   _sz.Canvas.prototype.animate = function(animFunc) {
     var that = this;
-    requestAnimFrame(function() {
-      that.animate(animFunc);
-    });
-    animFunc();
+
+    if(this._opts.runAnimation === true) {
+      this._animReqId = requestAnimFrame(function() {
+        that.animate(animFunc);
+      });
+      animFunc();
+    }
+  };
+
+  _sz.Canvas.prototype.start = function(animFunc) {
+    var that = this;
+    this._opts.runAnimation = true;
+
+    if(!this._animReqId) {
+      this._animReqId = requestAnimFrame(function() {
+        that.animate(animFunc);
+      });
+      animFunc();
+    }
+  };
+
+  _sz.Canvas.prototype.stop = function() {
+    this._opts.runAnimation = false;
+    cancelAnimFrame(this._animReqId);
+    this._animReqId = false;
+  };
+
+  _sz.Canvas.prototype.onresize_func = _sz.Canvas.onresize_func || function(evt) {
+    var o = this._opts,
+      szP = jQuery(o.szParent);
+
+    o.width = szP.width();
+    o.height = szP.outerHeight();
+    o.cssWidth = szP.css('width');
+    o.cssHeight = szP.css('height');
+
+    this._canvas.width(o.width()).height(o.outerHeight());
+    this._canvas.css('width', o.cssWidth).css('height', o.cssHeight);
   };
 
   window.sz = _sz;

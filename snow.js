@@ -25,14 +25,16 @@
     return Math.floor(Math.random() * (max - min + 1) + min);
   };
 
-  _sz.renderDropToCanvas = function(obj, renderFunction) {
-    var $buffer = jQuery('canvas.snow.buffer');
-
-    if( $buffer.length ) {
-      var buffer = $buffer.get(0);
-      renderFunction(obj, buffer.getContext('2d'));
-    }
-  };
+  // shim clear method into 2d canvas rendering context
+  // http://jsfiddle.net/wYA9y/
+  CanvasRenderingContext2D.prototype.clear =
+    CanvasRenderingContext2D.prototype.clear ||
+    function() {
+      this.save();
+      this.globalCompositeOperation = 'destination-out';
+      this.fill();
+      this.restore();
+    };
 
   _sz.sinMotion = function(value, height, waveLength) {
     if( waveLength === 0 || value === undefined ||
@@ -61,100 +63,20 @@
 
     snow: [],
 
-    init: function() {
-      var $b = $('body');
-      var $c = $('<canvas>')
-                .addClass('snow')
-                .appendTo($b)
-                .width($b.width())
-                .height($b.height())
-                .css('position', 'fixed')
-                .css('left', '0')
-                .css('top', '-10px')
-/*              .css('pointer-events', 'none')*/
-                .css('z-index', '9999');
-
-      var $buf = $('canvas.snow.buffer');
-
-      if( $buf.length === 0 ) {
-        $buf = $('<canvas>')
-                  .addClass('buffer')
-                  .addClass('snow')
-                  .appendTo($b)
-                  .width($b.width())
-                  .height($b.height())
-                  .css('position', 'fixed')
-                  .css('left', '-100%')
-                  .css('top', '-10px')
-                  .css('z-index', '1');
-      }
-
-      var c = $c.get(0);
-      c.width = $b.width();
-      c.height = $b.height();
-
-      var buf = $buf.get(0);
-      buf.width = $b.width();
-      buf.height = $b.height();
-
-      $(window).on('resize', function (eventObject) {
-        var $b = $('body');
-        var $c = $('canvas.snow:not(.buffer)');
-        var $buf = $('canvas.snow.buffer');
-
-        if( $c.length ) {
-          $c.width($b.width()).height($b.height());
-          $c.get(0).width = $b.width();
-          $c.get(0).height = $b.height();
-        }
-
-        if( $buf.length ) {
-          $buf.width($b.width()).height($b.height());
-          $buf.get(0).width = $b.width();
-          $buf.get(0).height = $b.height();
-        }
-      });
-    },
-
-    initAnimation: function(context) {
-      var i = 0;
-      if( _sz.snow.snow.length === 0 ) {
-        for(i = 0;i < _sz.snow._NUM_OBJECTS;i++) {
-          _sz.snow.snow.push(new _sz.snow.SnowDrop());
+    animate: function() {
+      var i = 0,
+        sn = _sz.snow;
+      if( sn.snow.length === 0 ) {
+        for(i = 0;i < sn._NUM_OBJECTS;i++) {
+          sn.snow.push(new sn.SnowDrop());
         }
       }
 
-      var $b = jQuery('body');
-      context.clearRect(0, 0, $b.width(), $b.height());
-
-      var $buf = jQuery('canvas.snow.buffer');
-      if( !$buf.length ) {
-        $buf = jQuery('<canvas>')
-                .addClass('buffer')
-                .addClass('snow')
-                .appendTo($b)
-                .width($b.width())
-                .height($b.height())
-                .css('position', 'fixed')
-                .css('left', '-100%')
-                .css('top', '-10px')
-                .css('z-index', '1');
-
-         $buf.get(0).width = $b.width();
-         $buf.get(0).height = $b.height();
-      }
-
-      var buf = $buf.get(0);
-      var ctx = buf.getContext('2d');
-      ctx.clearRect(0, 0, buf.width, buf.height);
-
-      for(i = 0;i < _sz.snow.snow.length;i++) {
-        _sz.snow.snow[i]._animation(_sz.sinMotion);
-      }
-
-      context.drawImage(buf, 0, 0);
-      requestAnimFrame(function() {
-        _sz.snow.initAnimation(context);
+      sn.mainCanvas.render(function(ctx) {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        for(i = 0;i < sn.snow.length;i++) {
+          sn.snow[i]._animation(_sz.sinMotion, ctx);
+        }
       });
     },
 
@@ -168,10 +90,8 @@
     var sn = _sz.snow,
         gRI = _sz.getRandomInt;
 
-    this.canvas = jQuery('canvas.snow').get(0);
-
-    this.startX = gRI(0, this.canvas.width);
-    this.startY = -1 * gRI(0, this.canvas.height);
+    this.startX = gRI(0, sn.mainCanvas.width());
+    this.startY = -1 * gRI(0, sn.mainCanvas.height());
     this.x = this.startX;
     this.y = this.startY;
 
@@ -183,7 +103,7 @@
     this.startTime = (new Date()).getTime();
   };
 
-  _sz.snow.SnowDrop.prototype._animation = function(funcMoveX) {
+  _sz.snow.SnowDrop.prototype._animation = function(funcMoveX, ctx) {
     if(this.animate) {
       var time = (new Date()).getTime() - this.startTime;
       this.y = this.startY + this.speed * time / 1000;
@@ -195,45 +115,79 @@
         this.x = funcMoveX(time, this.amplitude, this.period) + this.startX;
       }
 
-      if( this.y >= document.body.clientHeight ) {
+      if( this.y >= _sz.snow.mainCanvas.height() ) {
         this._reset();
       }
 
-      this._redraw();
+      this._redraw(ctx);
     }
   };
 
-  _sz.snow.SnowDrop.prototype._redraw = function() {
-    _sz.renderDropToCanvas(this, function(obj, ctx) {
-      ctx.beginPath();
-      ctx.arc(obj.x, obj.y, obj.radius, 0, 2*Math.PI,false);
-      ctx.closePath();
-      ctx.fillStyle = '#fefefe';
-      ctx.shadowColor = '#ccc';
-      ctx.shadowBlur = 3;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      ctx.fill();
-    });
+  _sz.snow.SnowDrop.prototype._redraw = function(ctx) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, 2*Math.PI,false);
+    ctx.closePath();
+    ctx.fillStyle = '#fefefe';
+    ctx.shadowColor = '#ccc';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fill();
   };
 
   _sz.snow.SnowDrop.prototype.startAnimation = function() {
-    if( !this.animate ) {
+//    if( !this.animate ) {
       this.animate = true;
-      this._animation(_sz.sinMotion);
-    }
+//      this._animation(_sz.sinMotion);
+//    }
   };
 
   _sz.snow.SnowDrop.prototype.stopAnimation = function() {
     this.animate = false;
   };
 
+  _sz.snow.load = function() {
+    var $bg = jQuery('#bg'),
+      w = $bg.width(),
+      h = $bg.outerHeight(),
+      sn = _sz.snow;
+
+    sn.mainCanvas = new _sz.Canvas({
+        'width': w,
+        'height': h,
+        'cssWidth': $bg.css('width'),
+        'cssHeight': $bg.css('height'),
+        'szParent': '#bg',
+        'runAnimation': true
+      });
+
+    sn.mainCanvas.css({
+      'z-index': '1',
+      'position': 'absolute',
+      'left': '0',
+      'top': $bg.offset().top
+    });
+
+    sn.mainCanvas.attach().animate(sn.animate);
+
+    jQuery(document).ready(function() {
+      jQuery(window, '#bg').on('resize', sz.snow.mainCanvas.onresize_func);
+    });
+  };
+
+  _sz.snow.unload = function() {
+    var sn = _sz.snow;
+
+    sn.mainCanvas.stop(); // kill anim loop
+    sn.snow.length = 0; // dereference SnowDrop objects
+    sn.mainCanvas.remove(); // remove from DOM
+    sn.mainCanvas = undefined; // dereference for gc
+  };
+
   window.sz = _sz;
 
-  (function($) {
-//    _sz.snow.init();
+//  (function($) {
 //    $(document).ready(function() {
-//      _sz.snow.initAnimation(c.getContext('2d'));
 //    });
-  })(jQuery);
+//  })(jQuery);
 })(window);

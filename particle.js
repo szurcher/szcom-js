@@ -422,7 +422,7 @@
       ctx.restore();
   };
 
-  sz.particle.load = function() {
+  _sz.particle.load = function() {
     var $bg = jQuery('#bg'),
       numParts = 20, // number of particles running concurrently
       w = $bg.width(),
@@ -431,7 +431,9 @@
         'width': w,
         'height': h,
         'cssWidth': $bg.css('width'),
-        'cssHeight': $bg.css('height')
+        'cssHeight': $bg.css('height'),
+        'szParent': '#bg',
+        'runAnimation': true
       });
 
     screen.css({
@@ -442,33 +444,33 @@
     });
     screen.attach();
 
-    sz.particle.mainCanvas = screen;
+    _sz.particle.mainCanvas = screen;
 
     (numParts).times(function(i) {
-      new sz.particle.Firefly();
+      tmp = new _sz.particle.Firefly();
+      tmp.animate = true;
     });
 
-    for(var i = 0; i < sz.particle.animObjects.length; i++) {
-      sz.particle.animObjects[i].animate = true;
-    }
+    _sz.particle.mainCanvas.animate(_sz.particle.animate);
 
-    sz.particle.mainCanvas.animate(sz.particle.animate);
+    (function($) {
+      $(document).ready(function () {
+        $(window, '#bg').on('resize', sz.particle.mainCanvas.onresize_func);
+      });
+    })(jQuery);
+  };
+
+  _sz.particle.unload = function() {
+    var sp = _sz.particle;
+
+    sp.mainCanvas.stop(); // kill animation loop
+
+    sp.animObjects.length = 0; // dereference Firefly objects
+
+    sp.mainCanvas.remove(); // remove from DOM
+    sp.mainCanvas = undefined; // dereference for gc
   };
 
   window.sz = _sz;
 
-  (function($) {
-    $(document).ready(function () {
-      $(window, '#bg').on('resize', function(evt) {
-        var $b = $('#bg'),
-          $c = $('canvas');
-
-        $c.each(function(idx) {
-          $(this).width($b.width()).height($b.outerHeight());
-          this.width = $b.width();
-          this.height = $b.height();
-        });
-      });
-    });
-  })(jQuery);
 })(window);

@@ -35,35 +35,16 @@
     return Math.floor(Math.floor(Math.random() * (max - min + 1)) + min);
   };
 
-  _sz.renderFlyToCanvas = function(flyId, renderFunction, buffer) {
-    var $buf;
-    if( buffer !== undefined ) {
-      $buf = buffer;
-    }
-    else {
-      $buf = jQuery('canvas.fw.buffer');
-    }
-
-    if( $buf.length ) {
-      var buf = $buf.get(0);
-      renderFunction(flyId, buf.getContext('2d'));
-    }
-  };
-
-  _sz.renderFlowerToCanvas = function(obj, renderFunction, buffer) {
-    var $buf;
-    if( buffer !== undefined ) {
-      $buf = buffer;
-    }
-    else {
-      $buf = jQuery('canvas.fw.buffer');
-    }
-
-    if( $buf.length ) {
-      var buf = $buf.get(0);
-      renderFunction(obj, buf.getContext('2d'));
-    }
-  };
+  // shim clear method into 2d canvas rendering context
+  // http://jsfiddle.net/wYA9y/
+  CanvasRenderingContext2D.prototype.clear =
+    CanvasRenderingContext2D.prototype.clear ||
+    function() {
+      this.save();
+      this.globalCompositeOperation = 'destination-out';
+      this.fill();
+      this.restore();
+    };
 
   _sz.linearMotionX = function(angle, speed) {
     if( angle == 90 ) {
@@ -113,117 +94,72 @@
       '34,153,255,', //'blue',
       '231,216,88,', //'yellow',
     ],
+    mainCanvas: undefined,
 
-    setup: function() {
-      // create and attach canvas and default off-screen buffer
-      var $b = $('body');
-      var $c = $('<canvas>')
-        .addClass('fw')
-        .appendTo($b)
-        .width($b.width())
-        .height($b.height())
-        .css('position', 'fixed')
-        .css('left', '0')
-        .css('top', '-10px')
-//        .css('pointer-events', 'none')
-        .css('z-index', '9999');
+    load: function() {
+      var $bg = jQuery('#bg'),
+        w = $bg.width(),
+        h = $bg.outerHeight(),
+        fw = _sz.fireworks;
 
-      var $buf = $('<canvas>')
-        .addClass('buffer')
-        .addClass('fw')
-        .appendTo($b)
-        .width($b.width())
-        .height($b.height())
-        .css('position', 'fixed')
-        .css('left', '-100%')
-        .css('top', '-10px')
-        .css('z-index', '1');
+      fw.mainCanvas = new _sz.Canvas({
+        'width': w,
+        'height': h,
+        'cssWidth': $bg.css('width'),
+        'cssHeight': $bg.css('height'),
+        'szParent': '#bg',
+        'runAnimation': true
+      });
 
-      var c = $c.get(0);
-      c.width = $b.width();
-      c.height = $b.height();
+      fw.mainCanvas.css({
+        'z-index': '1',
+        'position': 'absolute',
+        'left': '0',
+        'top': $bg.offset().top
+      });
 
-      var buf = $buf.get(0);
-      buf.width = c.width;
-      buf.height = c.height;
+      fw.mainCanvas.attach().animate(fw.init);
 
       // resize canvas to match screen
-      $(window).on('resize', function(eventObject) {
-        var $b = $('body');
-        var $c = $('canvas.fw:not(.buffer)');
-        var $buf = $('canvas.fw.buffer');
-        var c = $c.get(0);
-        var buf = $buf.get(0);
-
-        if( $c.length ) {
-          $c.width($b.width()).height($b.height());
-          c.width = $b.width();
-          c.height = $b.height();
-        }
-
-        if( $buf.length ) {
-          $buf.width(c.width).height(c.height);
-          buf.width = c.width;
-          buf.height = c.height;
-        }
+      jQuery(document).ready(function() {
+        jQuery(window, '#bg').on('resize',
+          sz.fireworks.mainCanvas.onresize_func);
       });
+    },
+
+    unload: function() {
+      var fw = _sz.fireworks;
+
+      fw.mainCanvas.stop();
+      fw._flies.length = fw._flowers.length = 0;
+      fw.mainCanvas.remove();
+      fw.mainCanvas = undefined;
     },
 
     // initialize and run fireworks animation
     // -- context - main canvas 2d context
-    init: function(context) {
-      var $b = jQuery('body');
-      context.save();
-      context.clearRect(0, 0, $b.width(), $b.height());
-
-      // get buffer canvas object, or create and attach it to the body
-      var $buf = jQuery('canvas.fw.buffer');
-      if( !$buf.length ) {
-        $buf = jQuery('<canvas>')
-                .addClass('buffer')
-                .addClass('fw')
-                .appendTo($b)
-                .width($b.width())
-                .height($b.height())
-                .css('position', 'fixed')
-                .css('left', '-100%')
-                .css('top', '-10px')
-                .css('z-index', '1');
-
-        $buf.get(0).width = $b.width();   // set width and height to body params
-        $buf.get(0).height = $b.height();
-      }
-
-      var buf = $buf.get(0);
-      var ctx = buf.getContext('2d');
-      ctx.save();
-      ctx.clearRect(0, 0, buf.width, buf.height);
-
+    init: function() {
       // effectively a while loop with counter, i is used as an id
       for(var i = 0; _sz.fireworks._flies.length < _sz.fireworks._MAX_OBJECTS; i++) {
         _sz.fireworks._flies.push(new _sz.fireworks.Fly(i));
       }
 
-      for(i = 0; i < _sz.fireworks._flies.length; i++) {
-        _sz.fireworks._flies[i]._animation(_sz.linearMotionX); // update existing objects for next frame
-      }
+      _sz.fireworks.mainCanvas.render(function(ctx) {
+        ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+        for(i = 0; i < _sz.fireworks._flies.length; i++) {
+          // update existing objects for next frame
+          _sz.fireworks._flies[i]._animation(_sz.linearMotionX, ctx);
+        }
 
-      for(i = 0; i < _sz.fireworks._flowers.length; i++) {
-        _sz.fireworks._flowers[i]._animation(); // update any 'flowers' (bursts), too
-      }
-
-      context.drawImage(buf, 0, 0); // copy from buffer to main canvas
-
-      ctx.restore();
-      context.restore();
-
-      // loop next frame
-      requestAnimFrame(function() {
-        _sz.fireworks.init(context);
+        for(i = 0; i < _sz.fireworks._flowers.length; i++) {
+          // update any 'flowers' (bursts), too
+          _sz.fireworks._flowers[i]._animation(ctx);
+        }
       });
     },
 
-    // object that displays rocket launch and travel and triggers a 'flower' (burst) at end of path
+    // Object that displays rocket launch and travel.
+    // Triggers a 'flower' (burst) at end of path.
     Fly: function(idx) {
       this.flyId = idx;
       this.animate = true;
@@ -248,9 +184,6 @@
         fw = _sz.fireworks,
         numParticles = gRI(fw._MIN_PARTICLES, fw._MAX_PARTICLES);
 
-
-    this.canvas = jQuery('canvas.fw').get(0);
-
     this.speed = gRI(fw._MIN_BLOOM_SPEED, fw._MAX_BLOOM_SPEED);
     this.dissolveTime = gRI(fw._MIN_DISSOLVE_SPEED, fw._MAX_DISSOLVE_SPEED);
     
@@ -268,17 +201,18 @@
   };
 
   // calculate new values for movement in animation frame
-  _sz.fireworks.Flower.prototype._animation = function() {
-    var i;
+  _sz.fireworks.Flower.prototype._animation = function(ctx) {
+    var i,
+      fw = _sz.fireworks;
     if( this.animate ) {
       var len = this.particles.length;
       this.time = (new Date()).getTime() - this.startTime;
 
       if( this.time > this.dissolveTime ) {
         // find object in array and splice out (garbage collect)
-        for(i = 0;i < _sz.fireworks._flowers.length;i++) {
-          if( _sz.fireworks._flowers[i].id === this.id ) {
-            _sz.fireworks._flowers.splice(i,1);
+        for(i = 0;i < fw._flowers.length;i++) {
+          if( fw._flowers[i].id === this.id ) {
+            fw._flowers.splice(i,1);
             return;
           }
         }
@@ -289,13 +223,13 @@
               angle = 2*Math.PI/len * i,
               hypLen = this.speed * this.time / 1000;
 
-          if( _sz.fireworks._TRAIL > 0 ) {
+          if( fw._TRAIL > 0 ) {
             // add last position to history
             part.histX.push(part.x);
             part.histY.push(part.y);
 
             // remove oldest position from history
-            if( part.histX.length > _sz.fireworks._TRAIL ) {
+            if( part.histX.length > fw._TRAIL ) {
               part.histX.shift();
               part.histY.shift();
             }
@@ -309,24 +243,25 @@
             (hypLen-Math.pow(0.000125*3.5*this.time,2));
         }
 
-        _sz.renderFlowerToCanvas(this, this._render);
+        this._render(ctx);
       }
     }
   };
 
   // draw each particle as a filled circle
-  _sz.fireworks.Flower.prototype._render = function(obj, context) {
+  _sz.fireworks.Flower.prototype._render = function(context) {
     context.save();
-    var alpha = 1;
+    var alpha = 1,
+      fw = _sz.fireworks;
 
-    context.fillStyle = 'rgba(' + _sz.fireworks._colors[obj.colorIdx] + alpha + ')';
+    context.fillStyle = 'rgba(' + fw._colors[this.colorIdx] + alpha + ')';
     context.shadowColor = 'rgba(255,255,255,0.4)';
-    context.shadowBlur = _sz.fireworks._SIZE*4;
+    context.shadowBlur = fw._SIZE*4;
     context.shadowOffsetX = 0;
     context.shadowOffsetY = 0;
 
-    for(var i = 0;i < obj.particles.length;i++) {
-      var p = obj.particles[i];
+    for(var i = 0;i < this.particles.length;i++) {
+      var p = this.particles[i];
       for(var j = 0;j < p.histX.length;j++) {
         context.beginPath();
         context.arc(p.histX[j], p.histY[j], _sz.fireworks._SIZE, 2*Math.PI, false);
@@ -344,14 +279,11 @@
   // calculate new starting values once an animation sequence is complete
   _sz.fireworks.Fly.prototype._reset = function() {
     var gRI = _sz.getRandomInt;
-    var fw = _sz.fireworks;
+    var fw = _sz.fireworks,
+      canvasHeight = fw.mainCanvas.height();
 
-    this.canvas = jQuery('canvas.fw').get(0);
-
-    this.startX = gRI(100, this.canvas.width - 100);
-    this.startY = document.body.clientHeight;
-    this.x = this.startX;
-    this.y = this.startY;
+    this.x = this.startX = gRI(100, fw.mainCanvas.width() - 100);
+    this.y = this.startY = canvasHeight;
 
     this.colorIdx = gRI(0, fw._colors.length);
     if( this.colorIdx == fw._colors.length ) {
@@ -360,7 +292,7 @@
     this.speed = gRI(fw._MIN_SPEED, fw._MAX_SPEED);
     this.angle = gRI(fw._MIN_ANGLE, fw._MAX_ANGLE); // within several degrees of 90
     this.flickerSpeed = gRI(fw._MIN_FLICKER_SPEED, fw._MAX_FLICKER_SPEED);
-    this.burstHeight = this.startY - Math.floor(document.body.clientHeight * 
+    this.burstHeight = this.startY - Math.floor(canvasHeight * 
       gRI(fw._MIN_BURST_HEIGHT, fw._MAX_BURST_HEIGHT)/100
     );
 
@@ -369,12 +301,12 @@
   };
 
   // calculate new position for animation frame
-  _sz.fireworks.Fly.prototype._animation = function(funcMoveX) {
+  _sz.fireworks.Fly.prototype._animation = function(funcMoveX, ctx) {
     if( this.animate ) {
       this.time = (new Date()).getTime() - this.startTime;
-      var new_y = this.startY - this.speed * this.time / 1000;
-//      var new_x = this.x + funcMoveX(this.angle, this.speed);
-      var new_x = this.x;
+      var new_y = this.startY - this.speed * this.time / 1000,
+//      new_x = this.x + funcMoveX(this.angle, this.speed);
+        new_x = this.x;
 
       // remember y starts at 0 at top of screen and grows downward
       // so once the upward fired rocket surpasses it's intended
@@ -386,11 +318,12 @@
         this._burst();
         this._reset();
       }
+      else {
+        this.y = new_y;
+        this.x = new_x;
+      }
 
-      this.y = new_y;
-      this.x = new_x;
-
-      this._redraw();
+      this._redraw(ctx);
     }
   };
 
@@ -398,20 +331,19 @@
   _sz.fireworks.Fly.prototype._burst = function() {
     var flw = _sz.fireworks._flowers;
 
-    flw.push(new _sz.fireworks.Flower(this.x, this.y, this.colorIdx, this.i + '-' + (new Date().getTime())));
+    flw.push(new _sz.fireworks.Flower(this.x, this.y, this.colorIdx,
+     this.i + '-' + (new Date().getTime())));
   };
 
   // draw rectangle to represent rocket
-  _sz.fireworks.Fly.prototype._redraw = function() {
-    _sz.renderFlyToCanvas(this.flyId, function(flyId, ctx) {
-      var that = _sz.fireworks._flies[flyId];
-      var alpha = _sz.setAlpha(that.time, that.flickerSpeed);
+  _sz.fireworks.Fly.prototype._redraw = function(ctx) {
+    var alpha = _sz.setAlpha(this.time, this.flickerSpeed),
+      fw = _sz.fireworks;
 
-      ctx.save();
-      ctx.fillStyle = 'rgba(' + _sz.fireworks._colors[0] + alpha + ')';
-      ctx.fillRect(that.x, that.y, _sz.fireworks._SIZE, 2*_sz.fireworks._SIZE);
-      ctx.restore();
-    });
+    ctx.save();
+    ctx.fillStyle = 'rgba(' + fw._colors[0] + alpha + ')';
+    ctx.fillRect(this.x, this.y, fw._SIZE, 2*fw._SIZE);
+    ctx.restore();
   };
 
   // callable function to begin animation
@@ -429,12 +361,4 @@
   };
 
   window.sz = _sz;
-
-  (function($) {
-//    sz.fireworks.setup();
-    // start animation
-//    $(document).ready(function() {
-//      sz.fireworks.init(c.getContext('2d'));
-//    });
-  })(jQuery);
 })(window);
