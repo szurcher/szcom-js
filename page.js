@@ -1,5 +1,5 @@
 (function( $ ) {
-  var csrfToken = $.cookie('csrftoken');
+  var csrfToken = Cookies.get('csrftoken');
 
   function csrfSafeMethod(method) {
     // HTTPD methods that do not require a CSRF token header
@@ -18,6 +18,9 @@
   });
 
   $(document).ready(function() {
+    // make sure namespace exists
+    window.sz = window.sz || {};
+
     // activate tooltip.js on rel=tooltip
     $('[data-smz-tooltip=show]').tooltip();
 
@@ -41,6 +44,40 @@
           .removeClass('glyphicon-chevron-up');
       }
     });
+
+    // Set up animation drop-down handler
+    sz.animSelect = $('form[name=animControl]').find('select');
+
+    // Get stored selection value if it exists
+    var animChoice = Cookies.get('szAnimChoice') || sz.animSelect.val();
+
+    sz.animSelect.data("prev", sz.animSelect.val()) // create data attrib
+      .on("change", function(event) { // handle change event
+        var $this = $(this);
+        var curVal = $this.val(),
+          prevVal = $this.data("prev");
+
+        // unload existing animation if selection changed
+        if( prevVal != curVal ) {
+          // Store selection
+          Cookies.set('szAnimChoice', curVal);
+
+          if( prevVal != "unload" &&
+            sz[prevVal] !== undefined ) {
+            sz[prevVal].unload();
+          }
+
+          // load new animation if any
+          if( curVal != "unload" && sz[curVal] !== undefined ) {
+            sz[curVal].load();
+          }
+
+          // update data attrib
+          $this.data("prev", curVal);
+        }
+      }
+    )
+    .val(animChoice).change(); // make sure stored value set
 
     // check for links that have a position:
     // relative but no top/left attribute (or have auto)

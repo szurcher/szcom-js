@@ -1,58 +1,25 @@
+/** fireworks.js ***********************************************************
+ *
+ * Author: Stephen Zurcher <stephen.zurcher@gmail.com>
+ * License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
+ *
+ ************************************************************************/
 (function( window, undefined ) {
-  var _sz = {};
+  // load namespace or create it
+  var _sz = window.sz || {};
 
-  // init with existing object if available
-  if( window.sz !== undefined ) {
-    _sz = window.sz;
+  _sz._loaded = _sz._loaded || {};
+  _sz._err = _sz._err || {};
+
+  // require utils.js and canvas.js
+  if( _sz._loaded.utils !== true ) { // utils not loaded
+    _sz._err.fireworks = ["Utils not loaded"];
+    return;
   }
-
-  window.requestAnimFrame = (function(callback) {
-    return window.requestAnimationFrame || window.webkitRequestAnimationFrame ||
-      window.mozRequestAnimationFrame || window.oRequestAnimationFrame ||
-      window.msRequestAnimationFrame ||
-      function(callback) {
-        window.setTimeout(callback, 1000 / 60);
-      };
-  })();
-
-  _sz.setAlpha = function(delta, rate) {
-        // [0 - 1] percent of rate (which is in milliseconds) 
-    var moment = (delta % rate)/rate,
-
-        // [0 - 1] percent in a 2*PI cycle
-        rad = 2*Math.PI*moment,
-
-        // [0 - 1] value period shifted so 0 = 0, pi = 1, 2*pi = 0 
-        // amplitude adjusted to 1, values adjusted to be from 0 instead of -1
-        opacity = 0.5*Math.cos(1/Math.PI*rad+Math.PI)+1;
-
-        // convert decimal opacity percent to 0-255 scale
-        return opacity*100/255;
-  };
-
-  _sz.getRandomInt = function(min, max) {
-    // Math.round would not provide a uniform distribution
-    return Math.floor(Math.floor(Math.random() * (max - min + 1)) + min);
-  };
-
-  // shim clear method into 2d canvas rendering context
-  // http://jsfiddle.net/wYA9y/
-  CanvasRenderingContext2D.prototype.clear =
-    CanvasRenderingContext2D.prototype.clear ||
-    function() {
-      this.save();
-      this.globalCompositeOperation = 'destination-out';
-      this.fill();
-      this.restore();
-    };
-
-  _sz.linearMotionX = function(angle, speed) {
-    if( angle == 90 ) {
-      return 0;
-    }
-    return speed / Math.tan(angle*Math.PI/180);
-//    return 0;
-  };
+  else if( _sz._loaded.canvas !== true ) { // canvas not loaded
+    _sz._err.fireworks = ["Canvas not loaded"];
+    return;
+  }
 
   _sz.fireworks = {
     _MIN_SPEED:  100, // y pixels
@@ -80,7 +47,7 @@
     _MAX_OBJECTS: 6, // on screen at a time
 
     _SIZE: 2.5,
-    _TRAIL: 0,  // too inefficient, but don't
+    _TRAIL: 1,  // too inefficient, but don't
                 // want to recode to not clear screen >_>
 
     _flies: [],
@@ -107,6 +74,7 @@
         'height': h,
         'cssWidth': $bg.css('width'),
         'cssHeight': $bg.css('height'),
+        'parent': '#bg',
         'szParent': '#bg',
         'runAnimation': true
       });
@@ -115,15 +83,21 @@
         'z-index': '1',
         'position': 'absolute',
         'left': '0',
-        'top': $bg.offset().top
+        'top': '0'
       });
 
       fw.mainCanvas.attach().animate(fw.init);
 
       // resize canvas to match screen
       jQuery(document).ready(function() {
-        jQuery(window, '#bg').on('resize',
-          sz.fireworks.mainCanvas.onresize_func);
+        var cvs = _sz.fireworks.mainCanvas;
+
+        if( cvs !== undefined ) {
+          jQuery(window, '#bg').on('resize', {
+            'canvas': cvs
+          },
+          cvs.onresize_func);
+        }
       });
     },
 
@@ -145,7 +119,8 @@
       }
 
       _sz.fireworks.mainCanvas.render(function(ctx) {
-        ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+        ctx.save();
+        ctx.translate(0.5,0.5);
         for(i = 0; i < _sz.fireworks._flies.length; i++) {
           // update existing objects for next frame
           _sz.fireworks._flies[i]._animation(_sz.linearMotionX, ctx);
@@ -155,7 +130,22 @@
           // update any 'flowers' (bursts), too
           _sz.fireworks._flowers[i]._animation(ctx);
         }
+        ctx.restore();
       });
+    },
+
+    rmFlower: function(id) {
+      var fw = _sz.fireworks;
+      // find object in array and splice out (garbage collect)
+      for(i = 0;i < fw._flowers.length;i++) {
+        if( fw._flowers[i].id === id ) {
+          fw._flowers.splice(i,1);
+          return;
+        }
+      }
+      if( console !== undefined ) {
+        console.log("Error: sz.Flower with id of " + id + " not found.");
+      }
     },
 
     // Object that displays rocket launch and travel.
@@ -174,6 +164,7 @@
       this.startY = pointY;
       this.colorIdx = colorIdx;
       this.particles = []; // x,y coords of each particle
+      this.makeRefCanvas();
       this._init();
     }
   };
@@ -200,80 +191,125 @@
     this.time = null;
   };
 
+  _sz.fireworks.Flower.prototype._clear = function(ctx) {
+    var rC = this.refCanvas.get2DContext().canvas;
+    var rCW = rC.width,
+      rCH = rC.height;
+
+    ctx.save();
+    for(i = 0;i < this.particles.length;i++) {
+      var part = this.particles[i];
+
+      for(j = 0;j < part.histX.length;j++) {
+        ctx.clearRect(part.histX[j]-2, part.histY[j]-2, rCW+4, rCH+4);
+      }
+      ctx.clearRect(part.x-2, part.y-2, rCW+4, rCH+4);
+    }
+    ctx.restore();
+  };
+
   // calculate new values for movement in animation frame
   _sz.fireworks.Flower.prototype._animation = function(ctx) {
-    var i,
+    var i, j, part,
       fw = _sz.fireworks;
+
     if( this.animate ) {
       var len = this.particles.length;
       this.time = (new Date()).getTime() - this.startTime;
 
-      if( this.time > this.dissolveTime ) {
-        // find object in array and splice out (garbage collect)
-        for(i = 0;i < fw._flowers.length;i++) {
-          if( fw._flowers[i].id === this.id ) {
-            fw._flowers.splice(i,1);
-            return;
+      if( this.time >= this.dissolveTime ) {
+        this._clear(ctx);
+        fw.rmFlower(this.id);
+
+        return;
+      }
+
+      for(i = 0;i < len;i++) {
+        var angle = 2*Math.PI/len * i,
+            hypLen = this.speed * this.time / 1000;
+
+        part = this.particles[i];
+
+        if( fw._TRAIL > 0 ) {
+          // add last position to history
+          part.histX.push(part.x);
+          part.histY.push(part.y);
+
+          // remove oldest position from history
+          if( part.histX.length > fw._TRAIL ) {
+            part.histX.shift();
+            part.histY.shift();
           }
         }
+
+        // vertical movement adjusted to suggest effect of gravity
+        part.y = this.startY - Math.sin(angle)*hypLen +
+          2*(0.0098*3.5*this.time);
+
+        // horizontal movement adjusted to suggest effect of drag
+        part.x = this.startX + Math.cos(angle) * 
+          (hypLen-Math.pow(0.000125*3.5*this.time,2));
       }
-      else {
-        for(i = 0;i < len;i++) {
-          var part = this.particles[i],
-              angle = 2*Math.PI/len * i,
-              hypLen = this.speed * this.time / 1000;
 
-          if( fw._TRAIL > 0 ) {
-            // add last position to history
-            part.histX.push(part.x);
-            part.histY.push(part.y);
-
-            // remove oldest position from history
-            if( part.histX.length > fw._TRAIL ) {
-              part.histX.shift();
-              part.histY.shift();
-            }
-          }
-
-          // vertical movement adjusted to suggest effect of gravity
-          part.y = this.startY - Math.sin(angle)*hypLen + 2*(0.0098*3.5*this.time);
-
-          // horizontal movement adjusted to suggest effect of drag
-          part.x = this.startX + Math.cos(angle) * 
-            (hypLen-Math.pow(0.000125*3.5*this.time,2));
-        }
-
-        this._render(ctx);
-      }
+      this._clear(ctx); // clear previous, no reset
+      this._render(ctx);
     }
   };
 
+  _sz.fireworks.Flower.prototype.makeRefCanvas = function() {
+    var fw = _sz.fireworks,
+      refCnvs = new _sz.Canvas({
+        'width': fw._SIZE*4,
+        'height': fw._SIZE*4,
+        'cssWidth': (fw._SIZE*4) + 'px',
+        'cssHeight': (fw._SIZE*4) + 'px',
+      }),
+      color = 'rgba(' + fw._colors[this.colorIdx] + '1)';
+      shdwColor = 'rgba(' + fw._colors[this.colorIdx] + '0.4)';
+
+      refCnvs.render(function(ctx) {
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.shadowColor = shdwColor;
+        ctx.shadowBlur = ctx.width;
+        ctx.shadowOffsetX = ctx.shadowOffsetY = 0;
+
+        ctx.beginPath();
+        ctx.arc(Math.floor(ctx.canvas.width/2),
+          Math.floor(ctx.canvas.height/2), _sz.fireworks._SIZE, 0, 2*Math.PI,
+          false);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+    this.refCanvas = refCnvs;
+    return refCnvs;
+  };
+
   // draw each particle as a filled circle
-  _sz.fireworks.Flower.prototype._render = function(context) {
-    context.save();
+  _sz.fireworks.Flower.prototype._render = function(ctx) {
     var alpha = 1,
-      fw = _sz.fireworks;
+      fw = _sz.fireworks,
+      rC = this.refCanvas.get2DContext().canvas;
 
-    context.fillStyle = 'rgba(' + fw._colors[this.colorIdx] + alpha + ')';
-    context.shadowColor = 'rgba(255,255,255,0.4)';
-    context.shadowBlur = fw._SIZE*4;
-    context.shadowOffsetX = 0;
-    context.shadowOffsetY = 0;
+    var rCW = rC.width,
+      rCH = rC.height;
 
+    ctx.save();
     for(var i = 0;i < this.particles.length;i++) {
-      var p = this.particles[i];
-      for(var j = 0;j < p.histX.length;j++) {
-        context.beginPath();
-        context.arc(p.histX[j], p.histY[j], _sz.fireworks._SIZE, 2*Math.PI, false);
-        context.closePath();
-        context.fill();
+      var p = this.particles[i],
+        gA = ctx.globalAlpha,
+        len = p.histX.length;
+
+      for(var j = 0;j < len;j++) {
+        ctx.globalAlpha = 1*(j+1)/len;
+        ctx.drawImage(rC, p.x, p.y, rCW, rCH);
       }
-      context.beginPath();
-      context.arc(p.x, p.y, _sz.fireworks._SIZE, 2*Math.PI, false);
-      context.closePath();
-      context.fill();
+      ctx.globalAlpha = gA;
+      ctx.drawImage(rC, p.x, p.y, rCW, rCH);
     }
-    context.restore();
+    ctx.restore();
   };
 
   // calculate new starting values once an animation sequence is complete
@@ -285,10 +321,7 @@
     this.x = this.startX = gRI(100, fw.mainCanvas.width() - 100);
     this.y = this.startY = canvasHeight;
 
-    this.colorIdx = gRI(0, fw._colors.length);
-    if( this.colorIdx == fw._colors.length ) {
-      this.colorIdx -= 1;
-    }
+    this.colorIdx = gRI(0, (fw._colors.length - 1));
     this.speed = gRI(fw._MIN_SPEED, fw._MAX_SPEED);
     this.angle = gRI(fw._MIN_ANGLE, fw._MAX_ANGLE); // within several degrees of 90
     this.flickerSpeed = gRI(fw._MIN_FLICKER_SPEED, fw._MAX_FLICKER_SPEED);
@@ -303,6 +336,9 @@
   // calculate new position for animation frame
   _sz.fireworks.Fly.prototype._animation = function(funcMoveX, ctx) {
     if( this.animate ) {
+      ctx.clearRect(this.x, this.y, _sz.fireworks._SIZE+1,
+        2*(_sz.fireworks._SIZE+1));
+
       this.time = (new Date()).getTime() - this.startTime;
       var new_y = this.startY - this.speed * this.time / 1000,
 //      new_x = this.x + funcMoveX(this.angle, this.speed);
@@ -331,17 +367,17 @@
   _sz.fireworks.Fly.prototype._burst = function() {
     var flw = _sz.fireworks._flowers;
 
-    flw.push(new _sz.fireworks.Flower(this.x, this.y, this.colorIdx,
-     this.i + '-' + (new Date().getTime())));
+    flw.push(new _sz.fireworks.Flower(this.x-1, this.y,
+      this.colorIdx, this.flyId + '-' + (new Date().getTime())));
   };
 
   // draw rectangle to represent rocket
   _sz.fireworks.Fly.prototype._redraw = function(ctx) {
-    var alpha = _sz.setAlpha(this.time, this.flickerSpeed),
+    var alpha = _sz.getAlpha(this.time, this.flickerSpeed),
       fw = _sz.fireworks;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(' + fw._colors[0] + alpha + ')';
+    ctx.fillStyle = 'rgba(' + fw._colors[this.colorIdx] + alpha + ')';
     ctx.fillRect(this.x, this.y, fw._SIZE, 2*fw._SIZE);
     ctx.restore();
   };
@@ -360,5 +396,6 @@
     this.animate = false;
   };
 
+  _sz._loaded.fireworks = true;
   window.sz = _sz;
 })(window);

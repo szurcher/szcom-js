@@ -5,46 +5,20 @@
  *
  **********************************************************************/
 (function( window, undefined ) {
-  var _sz = {};
+  var _sz = window.sz || {};
 
-  // init with existing object if available
-  if( window.sz !== undefined ) {
-    _sz = window.sz;
+  _sz._loaded = _sz._loaded || {};
+  _sz._err = _sz._err || {};
+
+  // require utils.js and canvas.js
+  if( _sz._loaded.utils !== true ) { // utils not loaded
+    _sz._err.snow = ["Utils not loaded"];
+    return;
   }
-
-  window.requestAnimFrame = (function(callback) {
-    return window.requestAnimationFrame || window.webkitRequestAnimationFrame ||
-      window.mozRequestAnimationFrame || window.oRequestAnimationFrame ||
-      window.msRequestAnimationFrame ||
-      function(callback) {
-        window.setTimeout(callback, 1000 / 60);
-      };
-  })();
-
-  _sz.getRandomInt = function(min, max) {
-    return Math.floor(Math.random() * (max - min + 1) + min);
-  };
-
-  // shim clear method into 2d canvas rendering context
-  // http://jsfiddle.net/wYA9y/
-  CanvasRenderingContext2D.prototype.clear =
-    CanvasRenderingContext2D.prototype.clear ||
-    function() {
-      this.save();
-      this.globalCompositeOperation = 'destination-out';
-      this.fill();
-      this.restore();
-    };
-
-  _sz.sinMotion = function(value, height, waveLength) {
-    if( waveLength === 0 || value === undefined ||
-       height === undefined || waveLength === undefined ) {
-      return 0; // linear motion fallback
-    }
-    
-    return height * Math.sin((2 * Math.PI / waveLength) * value);
-  };
-
+  else if( _sz._loaded.canvas !== true ) { // canvas not loaded
+    _sz._err.snow = ["Canvas not loaded"];
+    return;
+  }
 
   _sz.snow = {
     _MIN_SPEED: 15,
@@ -157,6 +131,7 @@
         'height': h,
         'cssWidth': $bg.css('width'),
         'cssHeight': $bg.css('height'),
+        'parent': '#bg',
         'szParent': '#bg',
         'runAnimation': true
       });
@@ -165,13 +140,20 @@
       'z-index': '1',
       'position': 'absolute',
       'left': '0',
-      'top': $bg.offset().top
+      'top': '0'
     });
 
     sn.mainCanvas.attach().animate(sn.animate);
 
     jQuery(document).ready(function() {
-      jQuery(window, '#bg').on('resize', sz.snow.mainCanvas.onresize_func);
+      var cvs = _sz.snow.mainCanvas;
+
+      if( cvs !== undefined ) {
+        jQuery(window, '#bg').on('resize', {
+          'canvas': cvs
+        },
+        cvs.onresize_func);
+      }
     });
   };
 
@@ -184,10 +166,6 @@
     sn.mainCanvas = undefined; // dereference for gc
   };
 
+  _sz._loaded.snow = true;
   window.sz = _sz;
-
-//  (function($) {
-//    $(document).ready(function() {
-//    });
-//  })(jQuery);
 })(window);

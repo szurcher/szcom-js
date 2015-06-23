@@ -8,43 +8,18 @@
   // load namespace or create it
   var _sz = window.sz || {};
 
-  // shim clear method into 2d canvas rendering context
-  // http://jsfiddle.net/wYA9y/
-  CanvasRenderingContext2D.prototype.clear = CanvasRenderingContext2D.prototype.clear ||
-    function() {
-      this.save();
-      this.globalCompositeOperation = 'destination-out';
-      this.fill();
-      this.restore();
-    };
+  _sz._loaded = _sz._loaded || {};
+  _sz._err = _sz._err || {};
 
-  // shim Date.now
-  Date.now = Date.now || function() {
-    return (new Date()).getTime();
-  };
-
-  // shim requestAnimFrame
-  window.requestAnimFrame = window.requestAnimFrame || (function(callback) {
-    return window.requestAnimationFrame || window.webkitRequestAnimationFrame ||
-      window.mozRequestAnimationFrame || window.oRequestAnimationFrame ||
-      window.msRequestAnimationFrame ||
-      function(callback) {
-        window.setTimeout(callback, 1000 / 60);
-      };
-  })();
-
-  // because
-  Number.prototype.times = Number.prototype.times || function(callback) {
-    for(var i = 0;i < this; i++) {
-      callback.call(this, i);
-    }
-    return this + 0;
-  };
-
-  // make sure getRandomInt exists
-  _sz.getRandomInt = _sz.getRandomInt || function(min, max) {
-    return Math.floor(Math.random() * (max - min + 1) + min);
-  };
+  // require utils.js and canvas.js
+  if( _sz._loaded.utils !== true ) { // utils not loaded
+    _sz._err.particle = ["Utils not loaded"];
+    return;
+  }
+  else if( _sz._loaded.canvas !== true ) { // canvas not loaded
+    _sz._err.particle = ["Canvas not loaded"];
+    return;
+  }
 
   // define particle
   _sz.particle = {
@@ -275,62 +250,33 @@
 
     ctx.scale(this.scale_factor, this.scale_factor);
 
-    ctx.beginPath();
-
-    var clearIt = function(x,y) {
-      ctx.clearRect(x,y,refWidth,refHeight);
-    },
-    breakIt = function(x1,x2,y1,y2) {
-      if(x1 === x2 && y1 === y2) {
-        return true;
-      }
-      return false;
-    },
-    x = this.older_x,
+    var x = this.older_x,
     y = this.older_y,
     new_x = this.old_x,
-    new_y = this.old_y;
+    new_y = this.old_y,
+    newXFunc = function(x,new_x) { return Math.max(x-1,new_x); };
+    newYFunc = function(y,new_y) { return Math.max(y-1,new_y); };
 
-//    clearIt(x,y);
-
-    if(dirX === 0) { // left
-      if(dirY == 3) {
-        for(x,y; ; x=Math.max(x-1,new_x),y=Math.max(y-1,new_y)) {
-          clearIt(x,y);
-          if(breakIt(x,new_x,y,new_y)) {
-            break;
-          }
-        }
-      }
-      else if(dirY == 2) {
-        for(x,y; ; x=Math.max(x-1,new_x),y=Math.min(y+1,new_y)) {
-          clearIt(x,y);
-          if(breakIt(x,new_x,y,new_y)) {
-            break;
-          }
-        }
-      }
+    if(dirX === 0 && dirY == 2) { // left
+      newYFunc = function(y,new_y) { return Math.min(y+1,new_y); };
     }
     else if(dirX == 1) { // right
       if(dirY == 3) {
-        for(x,y; ; x=Math.min(x+1,new_x),y=Math.max(y-1,new_y)) {
-          clearIt(x,y);
-          if(breakIt(x,new_x,y,new_y)) {
-            break;
-          }
-        }
+        newXFunc = function(x,new_x) { return Math.min(x+1,new_x); };
       }
       else if(dirY == 2) {
-        for(x,y; ; x=Math.min(x+1,new_x),y=Math.min(y+1,new_y)) {
-          clearIt(x,y);
-          if(breakIt(x,new_x,y,new_y)) {
-            break;
-          }
-        }
+        newXFunc = function(x,new_x) { return Math.min(x+1,new_x); };
+        newYFunc = function(y,new_y) { return Math.min(y+1,new_y); };
       }
     }
 
-    ctx.closePath();
+    for(x,y; ; x=newXFunc(x,new_x),y=newYFunc(y,new_y)) {
+      ctx.clearRect(x-1,y-1,refWidth+2,refHeight+2);
+      if(x === new_x && y === new_y) {
+        break;
+      }
+    }
+
     ctx.restore();
   };
 
@@ -346,77 +292,53 @@
 
       ctx.scale(obj.scale_factor, obj.scale_factor);
 
-      ctx.globalAlpha = 0.1;
-
       var c = obj.refCanvas.get2DContext().canvas,
-        dirX = 1,
-        dirY = 3;
+        dirX = 1, // right
+        dirY = 3; // down
 
+      // determine direction of movement
+      // (changes sign of operation for motion blur effect)
       if(obj.x < obj.older_x) {
-        dirX = 0;
+        dirX = 0; // left
       }
       if(obj.y < obj.older_y) {
-        dirY = 2;
+        dirY = 2; // up
       }
 
-      var drawIt = function(x,y) {
-        ctx.drawImage(c,x,y,refWidth,refHeight);
-      },
-      breakIt = function(x1,x2,y1,y2) {
-        if(x1 === x2 && y1 === y2) {
-          return true;
-        }
-        return false;
-      },
-      x = obj.old_x,
+      var x = obj.old_x,
       y = obj.old_y,
       new_x = obj.x,
-      new_y = obj.y;
+      new_y = obj.y,
+      alphaStep = Math.min(1/(obj.old_x - obj.x), 1/(obj.old_y - obj.y)),
+      newXFunc = function(x,new_x) { return Math.max(x-1,new_x); },
+      newYFunc = function(y,new_y) { return Math.max(y-1,new_y); };
 
-//      drawIt(x, y);
-
-      if( dirX === 0 ) { // left
-        if( dirY == 3 ) {
-          for( x,y; ; x=Math.max(x-1, new_x),y=Math.max(y-1, new_y) ) {
-            drawIt(x,y);
-            ctx.globalAlpha = Math.min(new_x/x, new_y/y);
-
-            if( breakIt(x,new_x,y,new_y) ) {
-              break;
-            }
-          }
-        }
-        else if( dirY == 2) {
-          for( x,y; ; x=Math.max(x-1, new_x),y=Math.min(y+1, new_y) ) {
-            drawIt(x,y);
-            ctx.globalAlpha = Math.min(new_x/x, y/new_y);
-
-            if( breakIt(x,new_x,y,new_y) ) {
-              break;
-            }
-          }
-        }
+      // set motion blur stepping values
+      if( dirX === 0 && dirY == 2) { // left, up (left,down is preset)
+        newYFunc = function(y,new_y) { return Math.min(y+1,new_y); };
+        alphaStep = Math.min(1/(x - new_x), 1/(new_y - y));
       }
       else if( dirX == 1 ) { // right
-        if( dirY == 3 ) {
-          for( x,y; ; x=Math.min(x+1, new_x),y=Math.max(y-1, new_y) ) {
-            drawIt(x,y);
-            ctx.globalAlpha = Math.min(x/new_x, new_y/y);
-
-            if( breakIt(x,new_x,y,new_y) ) {
-              break;
-            }
-          }
+        if( dirY == 3 ) { // down
+          newXFunc = function(x,new_x) { return Math.min(x+1,new_x); };
+          alphaStep = Math.min(1/(new_x - x), 1/(y - new_y));
         }
-        else if( dirY == 2 ) {
-          for( x,y; ; x=Math.min(x+1, new_x),y=Math.min(y+1, new_y) ) {
-            drawIt(x,y);
-            ctx.globalAlpha = Math.min(x/new_x, y/new_y);
+        else if( dirY == 2 ) { // up
+          newXFunc = function(x,new_x) { return Math.min(x+1,new_x); };
+          newYFunc = function(y,new_y) { return Math.min(y+1,new_y); };
+          alphaStep = Math.min(1/(x - new_x), 1/(y - new_y));
+        }
+      }
 
-            if( breakIt(x,new_x,y,new_y) ) {
-              break;
-            }
-          }
+      ctx.globalAlpha = 0.1;
+
+      // blit image to canvas with motion blur effect
+      for(x,y; ; x=newXFunc(x,new_x),y=newYFunc(y,new_y)) {
+        ctx.drawImage(c, x, y, refWidth, refHeight);
+        ctx.globalAlpha = Math.min(ctx.globalAlpha + alphaStep, 1);
+
+        if( x === new_x && y === new_y ) {
+          break;
         }
       }
       ctx.restore();
@@ -432,6 +354,7 @@
         'height': h,
         'cssWidth': $bg.css('width'),
         'cssHeight': $bg.css('height'),
+        'parent': '#bg',
         'szParent': '#bg',
         'runAnimation': true
       });
@@ -440,7 +363,7 @@
       'z-index': '1',
       'position': 'absolute',
       'left': '0',
-      'top': $bg.offset().top
+      'top': '0'
     });
     screen.attach();
 
@@ -455,7 +378,14 @@
 
     (function($) {
       $(document).ready(function () {
-        $(window, '#bg').on('resize', sz.particle.mainCanvas.onresize_func);
+        var cvs = _sz.particle.mainCanvas;
+
+        if( cvs !== undefined ) {
+          $(window, '#bg').on('resize', {
+            'canvas': cvs
+          },
+          cvs.onresize_func);
+        }
       });
     })(jQuery);
   };
@@ -471,6 +401,7 @@
     sp.mainCanvas = undefined; // dereference for gc
   };
 
+  _sz._loaded.particle = true;
   window.sz = _sz;
 
 })(window);

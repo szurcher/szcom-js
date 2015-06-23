@@ -8,30 +8,13 @@
   // load namespace or create it
   var _sz = window.sz || {};
 
-  // make sure getRandomInt exists
-  _sz.getRandomInt = _sz.getRandomInt || function(min, max) {
-    return Math.floor(Math.random() * (max - min + 1) + min);
-  };
+  _sz._loaded = _sz._loaded || {};
 
-  // shim requestAnimFrame/cancelAnimFrame
-  window.requestAnimFrame = window.requestAnimFrame || (function() {
-    return window.requestAnimationFrame || window.webkitRequestAnimationFrame ||
-      window.mozRequestAnimationFrame || window.oRequestAnimationFrame ||
-      window.msRequestAnimationFrame ||
-      function(callback) {
-        return window.setTimeout(callback, 1000/60);
-      };
-  })();
-
-  window.cancelAnimFrame = window.cancelAnimFrame || (function() {
-    return window.cancelAnimationFrame || window.mozCancelAnimationFrame ||
-      window.webkitCancelAnimationFrame ||
-      window.webkit.CancelRequestAnimationFrame ||
-      window.oCancelAnimationFrame || window.msCancelAnimationFrame ||
-      function(id) {
-        window.clearTimeout(id);
-      };
-  })();
+  if( _sz._loaded.utils !== true ) { // utils not loaded
+    _sz._err = _sz._err || {};
+    _sz._err.canvas = ["Utils not loaded"];
+    return;
+  }
 
   /* sz.Canvas - Wrapper for canvas element using jQuery. By default creates a
    *  new, unattached canvas the same dimensions as the current document as
@@ -190,8 +173,8 @@
     this._animReqId = false;
   };
 
-  _sz.Canvas.prototype.onresize_func = _sz.Canvas.onresize_func || function(evt) {
-    var o = this._opts,
+  _sz.Canvas.prototype.onresize_func = _sz.Canvas.onresize_func || function(event) {
+    var o = event.data.canvas._opts,
       szP = jQuery(o.szParent);
 
     o.width = szP.width();
@@ -199,9 +182,22 @@
     o.cssWidth = szP.css('width');
     o.cssHeight = szP.css('height');
 
-    this._canvas.width(o.width()).height(o.outerHeight());
-    this._canvas.css('width', o.cssWidth).css('height', o.cssHeight);
+    event.data.canvas._canvas
+      .width(o.width)
+      .height(o.height);
+
+    var rawCanvas = event.data.canvas._canvas.get(0);
+
+    rawCanvas.width = o.width;
+    rawCanvas.height = o.height;
+
+    event.data.canvas._canvas
+      .css('width', o.cssWidth)
+      .css('height', o.cssHeight);
+
+    event.data.canvas._buffer = event.data.canvas._canvas.clone();
   };
 
+  _sz._loaded.canvas = true;
   window.sz = _sz;
 })(window);
