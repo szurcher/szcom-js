@@ -18,9 +18,6 @@
   });
 
   $(document).ready(function() {
-    // make sure namespace exists
-    window.sz = window.sz || {};
-
     // activate tooltip.js on rel=tooltip
     $('[data-smz-tooltip=show]').tooltip();
 
@@ -44,6 +41,9 @@
           .removeClass('glyphicon-chevron-up');
       }
     });
+
+    // make sure namespace alias exists
+    var sz = window._93f15a424f3b4388be789d482e982346;
 
     // Set up animation drop-down handler
     sz.animSelect = $('form[name=animControl]').find('select');
@@ -77,7 +77,8 @@
         }
       }
     )
-    .val(animChoice).change(); // make sure stored value set
+    .val(animChoice)
+    .change(); // make sure stored value set
 
     // check for links that have a position:
     // relative but no top/left attribute (or have auto)

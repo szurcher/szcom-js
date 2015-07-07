@@ -1,28 +1,36 @@
-/** particle.js *********************************************************
- *
- * Author: Stephen Zurcher <stephen.zurcher@gmail.com>
- * License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
- *
- *********************************************************************/
+/*"""
+sz.particle.js
+==============
+
+Author: Stephen Zurcher <stephen.zurcher@gmail.com>
+License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
+
+*/
 (function(window, undefined) {
-  // load namespace or create it
-  var _sz = window.sz || {};
-
-  _sz._loaded = _sz._loaded || {};
-  _sz._err = _sz._err || {};
-
-  // require utils.js and canvas.js
-  if( _sz._loaded.utils !== true ) { // utils not loaded
-    _sz._err.particle = ["Utils not loaded"];
-    return;
+  // access root library
+  var errMsg = "sz.particle.js requires sz.js to function. Load sz.js " +
+    "before loading sz.particle.js";
+  if( window._93f15a424f3b4388be789d482e982346 === undefined ) {
+    throw new Error(errMsg);
   }
-  else if( _sz._loaded.canvas !== true ) { // canvas not loaded
-    _sz._err.particle = ["Canvas not loaded"];
+
+  // alias
+  var sz = window._93f15a424f3b4388be789d482e982346;
+
+  if( !(sz.hasOwnProperty("uuid")) || sz.uuid !==
+    "93f15a42-4f3b-4388-be78-9d482e982346" ) {
+    throw new Error(errMsg);
+  }
+  // root library accessible
+
+  // require canvas.js
+  if( !(sz.isAvailable("canvas")) ) {
+    sz._err.particle = ["Canvas not loaded"];
     return;
   }
 
   // define particle
-  _sz.particle = {
+  sz.particle = {
     '_MIN_SPEED': 250, // pixels (per second)
     '_MAX_SPEED': 350,
 
@@ -34,17 +42,17 @@
     'Firefly': null // canvas graphic object
   };
 
-  _sz.particle.animate = function() {
-    _sz.particle.mainCanvas.render(function(ctx) {
-      for(i = 0;i < _sz.particle.animObjects.length;i++) {
-        _sz.particle.animObjects[i]._update(ctx);
+  sz.particle.animate = function() {
+    sz.particle.mainCanvas.render(function(ctx) {
+      for(i = 0;i < sz.particle.animObjects.length;i++) {
+        sz.particle.animObjects[i]._update(ctx);
       }
     });
   };
 
-  _sz.particle.Firefly = function() {
-    this.gRI = _sz.getRandomInt;
-    this.parent = _sz.particle;
+  sz.particle.Firefly = function() {
+    this.gRI = sz.getRandomInt;
+    this.parent = sz.particle;
     this._min_wait = this.gRI(0, 350);
     this._max_wait = this.gRI(700, 1500);
 
@@ -56,11 +64,11 @@
     this._init();
   };
 
-  _sz.particle.Firefly.prototype.flySize = 2;
+  sz.particle.Firefly.prototype.flySize = 2;
 
-  _sz.particle.Firefly.prototype.refCanvas = (function(func) {
+  sz.particle.Firefly.prototype.refCanvas = (function(func) {
     var size = func.prototype.flySize,
-      refCnvs = new _sz.Canvas({
+      refCnvs = new sz.Canvas({
         'width': size*4,
         'height': size*4,
         'cssWidth': (size*4) + 'px',
@@ -85,9 +93,9 @@
     });
 
     return refCnvs;
-  })(_sz.particle.Firefly);
+  })(sz.particle.Firefly);
 
-  _sz.particle.Firefly.prototype._directions = [
+  sz.particle.Firefly.prototype._directions = [
     [-1,0], // left
     [1,0], // right
     [0,-1], // up
@@ -98,7 +106,7 @@
 //    [1,1] // diag right down
   ];
 
-  _sz.particle.Firefly.prototype._accelerators = [
+  sz.particle.Firefly.prototype._accelerators = [
     function(cX, cY) { return 0; }, // static
     function(cX, cY) {
       var aX = Math.abs(cX);
@@ -108,18 +116,18 @@
     function(cX, cY) {
       var aX = Math.abs(cX);
       var aY = Math.abs(cY);
-      var rnd = _sz.getRandomInt(5,12);
+      var rnd = sz.getRandomInt(5,12);
       return (aX*aX + aY*aY)/rnd;
     }, // exponential variations
     function(cX, cY) {
-      return -1*(_sz.particle.Firefly.prototype._accelerators[1](cX,cY));
+      return -1*(sz.particle.Firefly.prototype._accelerators[1](cX,cY));
     }, // negative linear
     function(cX, cY) {
-      return -1*(_sz.particle.Firefly.prototype._accelerators[2](cX,cY));
+      return -1*(sz.particle.Firefly.prototype._accelerators[2](cX,cY));
     } // negative exponential
   ];
 
-  _sz.particle.Firefly.prototype._init = function() {
+  sz.particle.Firefly.prototype._init = function() {
     var cnvs = this.parent.mainCanvas;
 
     if( cnvs !== undefined ) {
@@ -140,11 +148,11 @@
     }
   };
 
-  _sz.particle.Firefly.prototype._accelerate = function(cX, cY) {
+  sz.particle.Firefly.prototype._accelerate = function(cX, cY) {
     this.speed += (this._accelerators[this.accel])(cX, cY);
   };
 
-  _sz.particle.Firefly.prototype._set_position = function() {
+  sz.particle.Firefly.prototype._set_position = function() {
     var changeX = Math.floor((this.speed *
       this.scale_factor *
       this._directions[this.direction][0]) *
@@ -166,7 +174,7 @@
     this.y += changeY;
   };
 
-  _sz.particle.Firefly.prototype._update = function(ctx) {
+  sz.particle.Firefly.prototype._update = function(ctx) {
     var that = this;
     if(this.animate) {
       this.prevTime = this.time;
@@ -233,16 +241,16 @@
     }
   };
 
-  _sz.particle.Firefly.prototype._clear = function(ctx) {
+  sz.particle.Firefly.prototype._clear = function(ctx) {
     var refWidth = this.refCanvas.width(), // stored img width
       refHeight = this.refCanvas.height(), // stored img height
-      dirX = 1,
-      dirY = 3;
+      dirX = 1, // right
+      dirY = 3; // down
 
-    if(this.old_x < this.older_x) {
+    if(this.old_x < this.older_x) { // left
       dirX = 0;
     }
-    if(this.old_y < this.older_y) {
+    if(this.old_y < this.older_y) { // up
       dirY = 2;
     }
 
@@ -254,33 +262,36 @@
     y = this.older_y,
     new_x = this.old_x,
     new_y = this.old_y,
-    newXFunc = function(x,new_x) { return Math.max(x-1,new_x); };
-    newYFunc = function(y,new_y) { return Math.max(y-1,new_y); };
+    clearY = this.older_y, // default clearY to 'down' direction
+    clearX = this.old_x, // default clearX to 'left' direction
+    width = this.older_x - this.old_x, // default left
+    height = this.old_y - this.older_y; // default down
 
-    if(dirX === 0 && dirY == 2) { // left
-      newYFunc = function(y,new_y) { return Math.min(y+1,new_y); };
+    if(dirX === 0 && dirY == 2) { // left/up
+      clearY = new_y;
+      height = y - new_y; // width/clearX unchanged
     }
     else if(dirX == 1) { // right
-      if(dirY == 3) {
-        newXFunc = function(x,new_x) { return Math.min(x+1,new_x); };
-      }
-      else if(dirY == 2) {
-        newXFunc = function(x,new_x) { return Math.min(x+1,new_x); };
-        newYFunc = function(y,new_y) { return Math.min(y+1,new_y); };
+      clearX = x;
+      width = new_x - x; // height/clearY unchanged for dirY == 3
+      if(dirY == 2) { // up
+        clearY = new_y;
+        height = y - new_y;
       }
     }
 
-    for(x,y; ; x=newXFunc(x,new_x),y=newYFunc(y,new_y)) {
-      ctx.clearRect(x-1,y-1,refWidth+2,refHeight+2);
-      if(x === new_x && y === new_y) {
-        break;
-      }
-    }
+    clearX -= 1; // pad clear rect to guard against sub-pixel anti-aliasing
+    clearY -= 1;
+    width += refWidth+2; // pad and compensate for left pad and object width
+    height += refHeight+2;
+
+    // one clearRect to rule them all...
+    ctx.clearRect(clearX, clearY, width, height);
 
     ctx.restore();
   };
 
-  _sz.particle.Firefly.prototype._paint = function(ctx) {
+  sz.particle.Firefly.prototype._paint = function(ctx) {
       var obj = this;
       var i,
           refWidth = obj.refCanvas.width(), // stored img width
@@ -344,12 +355,12 @@
       ctx.restore();
   };
 
-  _sz.particle.load = function() {
+  sz.particle.load = function() {
     var $bg = jQuery('#bg'),
       numParts = 20, // number of particles running concurrently
       w = $bg.width(),
       h = $bg.outerHeight(),
-      screen = new _sz.Canvas({
+      screen = new sz.Canvas({
         'width': w,
         'height': h,
         'cssWidth': $bg.css('width'),
@@ -367,18 +378,18 @@
     });
     screen.attach();
 
-    _sz.particle.mainCanvas = screen;
+    sz.particle.mainCanvas = screen;
 
     (numParts).times(function(i) {
-      tmp = new _sz.particle.Firefly();
+      tmp = new sz.particle.Firefly();
       tmp.animate = true;
     });
 
-    _sz.particle.mainCanvas.animate(_sz.particle.animate);
+    sz.particle.mainCanvas.animate(sz.particle.animate);
 
     (function($) {
       $(document).ready(function () {
-        var cvs = _sz.particle.mainCanvas;
+        var cvs = sz.particle.mainCanvas;
 
         if( cvs !== undefined ) {
           $(window, '#bg').on('resize', {
@@ -390,8 +401,8 @@
     })(jQuery);
   };
 
-  _sz.particle.unload = function() {
-    var sp = _sz.particle;
+  sz.particle.unload = function() {
+    var sp = sz.particle;
 
     sp.mainCanvas.stop(); // kill animation loop
 
@@ -401,7 +412,17 @@
     sp.mainCanvas = undefined; // dereference for gc
   };
 
-  _sz._loaded.particle = true;
-  window.sz = _sz;
+  // tag module as loaded
+  try {
+    sz.setAvailable("particle");
+  } catch (e) {
+    if(e instanceof sz._exceptions.SZAvailableError) {
+      return; // assume (perhaps dangerously) existing property is this
+    }
 
+    throw e;
+  }
+
+  // update global object
+  window._93f15a424f3b4388be789d482e982346 = sz;
 })(window);
