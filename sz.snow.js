@@ -46,27 +46,45 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
 
     snow: [],
 
-    animate: function() {
-      var i = 0,
-        sn = sz.snow;
-      if( sn.snow.length === 0 ) {
-        for(i = 0;i < sn._NUM_OBJECTS;i++) {
-          sn.snow.push(new sn.SnowDrop());
-        }
-      }
-
-      sn.mainCanvas.render(function(ctx) {
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        for(i = 0;i < sn.snow.length;i++) {
-          sn.snow[i]._animation(sz.sinMotion, ctx);
-        }
-      });
-    },
-
     SnowDrop: function() {
       this.animate = true;
       this._reset();
+    },
+
+    SnowCanvas: function(opts) {
+      sz.Canvas.call(this, opts);
     }
+  };
+
+  sz.snow.SnowCanvas.prototype = Object.create(sz.Canvas.prototype);
+  sz.snow.SnowCanvas.prototype.constructor = sz.snow.SnowCanvas;
+  sz.snow.SnowCanvas.prototype.restart = function() {
+    if( this._pauseTime > 0 ) {
+      var diff = Date.now() - this._pauseTime;
+      if( diff > 0 ) {
+        for(var i = 0;i < sz.snow.snow.length;i++) {
+          sz.snow.snow[i]._timeAdjust += diff;
+        }
+      }
+    }
+    this.start(sz.snow.animate);
+  };
+
+  sz.snow.animate = function() {
+    var i = 0,
+      sn = sz.snow;
+    if( sn.snow.length === 0 ) {
+      for(i = 0;i < sn._NUM_OBJECTS;i++) {
+        sn.snow.push(new sn.SnowDrop());
+      }
+    }
+
+    sn.mainCanvas.render(function(ctx) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      for(i = 0;i < sn.snow.length;i++) {
+        sn.snow[i]._animation(sz.sinMotion, ctx);
+      }
+    });
   };
 
   sz.snow.SnowDrop.prototype._reset = function() {
@@ -83,12 +101,14 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
     this.period = gRI(sn._MIN_PERIOD, sn._MAX_PERIOD);
   
     this.radius = gRI(sn._MIN_RADIUS, sn._MAX_RADIUS);
-    this.startTime = (new Date()).getTime();
+
+    this._timeAdjust = 0;
+    this.startTime = Date.now();
   };
 
   sz.snow.SnowDrop.prototype._animation = function(funcMoveX, ctx) {
     if(this.animate) {
-      var time = (new Date()).getTime() - this.startTime;
+      var time = (new Date()).getTime() - this.startTime - this._timeAdjust;
       this.y = this.startY + this.speed * time / 1000;
 
       if( this.amplitude === 0 || this.period === 0 ) {
@@ -149,7 +169,7 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
       jQuery.extend(_o, opts);
     }
 
-    sn.mainCanvas = new sz.Canvas(_o);
+    sn.mainCanvas = new sz.snow.SnowCanvas(_o);
 
     sn.mainCanvas.css({
       'z-index': '1',
@@ -164,10 +184,14 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
       var cvs = sz.snow.mainCanvas;
 
       if( cvs !== undefined ) {
-        jQuery(window, '#bg').on('resize', {
-          'canvas': cvs
-        },
-        cvs.onresize_func);
+        var data = { 'canvas': cvs };
+        jQuery(window, '#bg').on('resize', data, cvs.onresize_func);
+
+        jQuery(document).on(
+          document.visibilityChangeEvent,
+          data,
+          cvs.handleVisibilityChange
+        );
       }
     });
   };
@@ -176,6 +200,14 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
     var sn = sz.snow;
 
     sn.mainCanvas.stop(); // kill anim loop
+
+    // stop listener so animation switching doesn't throw next load
+    // into a bad state
+    jQuery(document).off(
+      document.visibilityChangeEvent,
+      sn.mainCanvas.handleVisibilityChange
+    );
+
     sn.snow.length = 0; // dereference SnowDrop objects
     sn.mainCanvas.remove(); // remove from DOM
     sn.mainCanvas = undefined; // dereference for gc

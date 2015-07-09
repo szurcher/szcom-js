@@ -79,6 +79,14 @@ Valid options are:
       this._canvas.get(0).height = o.height;
 
       this._buffer = this._canvas.clone();
+
+      this._pauseTime = undefined;
+
+      // define prototype.restart as function in child classes taking pauseTime
+      // as arg to enable page visibility api pausing
+      // make necessary adjustments to animation times and then call
+      // canvas start again
+      // also add event listener for visibilitychange
     }
   };
 
@@ -210,6 +218,23 @@ Valid options are:
       .css('height', o.cssHeight);
 
     event.data.canvas._buffer = event.data.canvas._canvas.clone();
+  };
+
+  sz.Canvas.prototype.handleVisibilityChange = function(event) {
+    var cvs = event.data.canvas;
+    if( document.hidden === undefined ||
+      document.visibilityChangeEvent === undefined ||
+      cvs.restart === undefined ) {
+      return;
+    }
+
+    if( document.hidden ) {
+      cvs._pauseTime = Date.now();
+      cvs.stop();
+    }
+    else {
+      cvs.restart(); // restart must be defined in child class
+    }
   };
 
   // tag module as loaded

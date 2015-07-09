@@ -42,6 +42,27 @@ Global var: window._93f15a424f3b4388be789d482e982346
   })(window._93f15a424f3b4388be789d482e982346); // don't clobber if already loaded
 
 /*"""
+Polyfill Page Visibility API
+*/
+  if( document.hidden === undefined ) {
+    if( document.mozHidden !== undefined ) {
+      document.hidden = document.mozHidden;
+      document.visibilityChangeEvent = "mozvisibilitychange";
+    }
+    else if( document.msHidden !== undefined ) {
+      document.hidden = document.msHidden;
+      document.visibilityChangeEvent = "msvisibilitychange";
+    }
+    else if( document.webkitHidden !== undefined ) {
+      document.hidden = document.webkitHidden;
+      document.visibilityChangeEvent = "webkitvisibilitychange";
+    }
+  }
+  else {
+    document.visibilityChangeEvent = "visibilitychange";
+  }
+
+/*"""
 Polyfill isArray (ie8 and lower)
 */
   Array.isArray = Array.isArray || function(arg) {

@@ -39,7 +39,26 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
     'animObjects': [],
 
     'animate': null, // animation loop function
-    'Firefly': null // canvas graphic object
+    'Firefly': null, // canvas graphic object
+
+    'ParticleCanvas': function(opts) {
+      sz.Canvas.call(this, opts);
+    }
+  };
+
+  sz.particle.ParticleCanvas.prototype = Object.create(sz.Canvas.prototype);
+  sz.particle.ParticleCanvas.prototype.constructor = sz.particle.ParticleCanvas;
+  sz.particle.ParticleCanvas.prototype.restart = function() {
+    if( this._pauseTime > 0 ) {
+      var diff = Date.now() - this._pauseTime;
+      if( diff > 0 ) {
+        var p = sz.particle.animObjects;
+        for(i = 0;i < p.length;i++) {
+          p[i]._timeAdjust += diff;
+        }
+      }
+    }
+    this.start(sz.particle.animate);
   };
 
   sz.particle.animate = function() {
@@ -78,16 +97,13 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
 
     refCnvs.render(function(context) {
       context.save();
-//      context.fillStyle = 'white';
       context.fillStyle = color;
-//      context.fillStyle = 'rgb(160,160,160)';
       context.shadowColor = context.fillStyle;
       context.shadowBlur = size;
       context.shadowOffsetX = context.shadowOffsetY = 0;
       context.beginPath();
       context.arc(size*2, size*2, size, 0, 2*Math.PI, false);
       context.closePath();
-//      context.fillRect(0, 0, context.canvas.width, context.canvas.height);
       context.fill();
       context.restore();
     });
@@ -144,6 +160,7 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
       this.startTime = Date.now();
       this.prevTime = this.startTime;
       this.time = null;
+      this._timeAdjust = 0;
       this.bounced = 0;
     }
   };
@@ -153,15 +170,16 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
   };
 
   sz.particle.Firefly.prototype._set_position = function() {
+    var timeDiff = this.time - this.prevTime;
     var changeX = Math.floor((this.speed *
       this.scale_factor *
       this._directions[this.direction][0]) *
-      ((this.time-this.prevTime)/1000));
+      (timeDiff/1000));
 
     var changeY = Math.floor((this.speed *
       this.scale_factor *
       this._directions[this.direction][1]) *
-      ((this.time-this.prevTime)/1000));
+      (timeDiff/1000));
 
     this._accelerate(changeX, changeY);
 //    this.speed += (changeX*changeX + changeY*changeY)/5;
@@ -178,7 +196,7 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
     var that = this;
     if(this.animate) {
       this.prevTime = this.time;
-      this.time = Date.now() - this.startTime;
+      this.time = Date.now() - this.startTime - this._timeAdjust;
 
       var chance = Math.max(99 - this.bounced*10,0);
 
@@ -360,7 +378,7 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
       numParts = 20, // number of particles running concurrently
       w = $bg.width(),
       h = $bg.outerHeight(),
-      screen = new sz.Canvas({
+      screen = new sz.particle.ParticleCanvas({
         'width': w,
         'height': h,
         'cssWidth': $bg.css('width'),
@@ -392,10 +410,14 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
         var cvs = sz.particle.mainCanvas;
 
         if( cvs !== undefined ) {
-          $(window, '#bg').on('resize', {
-            'canvas': cvs
-          },
-          cvs.onresize_func);
+          var data = { 'canvas': cvs };
+          $(window, '#bg').on('resize', data, cvs.onresize_func);
+
+          $(document).on(
+            document.visibilityChangeEvent,
+            data,
+            cvs.handleVisibilityChange
+          );
         }
       });
     })(jQuery);
@@ -406,8 +428,12 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
 
     sp.mainCanvas.stop(); // kill animation loop
 
-    sp.animObjects.length = 0; // dereference Firefly objects
+    $(document).off(
+      document.visibilityChangeEvent,
+      sp.mainCanvas.handleVisibilityChange
+    );
 
+    sp.animObjects.length = 0; // dereference Firefly objects
     sp.mainCanvas.remove(); // remove from DOM
     sp.mainCanvas = undefined; // dereference for gc
   };

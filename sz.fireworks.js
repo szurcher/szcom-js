@@ -79,162 +79,212 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
     mainCanvas: undefined,
     _frame: 0,
 
-    load: function() {
-      var $bg = jQuery('#bg'),
-        w = $bg.width(),
-        h = $bg.outerHeight(),
-        fw = sz.fireworks;
+      // sub-class sz.Canvas so we can override restart
+    FireworkCanvas: function(opts) {
+      sz.Canvas.call(this, opts);
+    }
+  };
 
-      fw.mainCanvas = new sz.Canvas({
-        'width': w,
-        'height': h,
-        'cssWidth': $bg.css('width'),
-        'cssHeight': $bg.css('height'),
-        'parent': '#bg',
-        'szParent': '#bg',
-        'runAnimation': true
-      });
+  sz.fireworks.FireworkCanvas.prototype = Object.create(sz.Canvas.prototype);
+  sz.fireworks.FireworkCanvas.prototype.constructor =
+    sz.fireworks.FireworkCanvas;
+  sz.fireworks.FireworkCanvas.prototype.restart = function() {
+    if( this._pauseTime > 0 ) {
+      var diff = Date.now() - this._pauseTime;
+      if( diff > 0 ) {
+        var flies = sz.fireworks._flies,
+          flowers = sz.fireworks._flowers;
+        for(var i = 0; i < flies.length; i++) {
+          flies[i]._timeAdjust += diff;
+        }
+        for(i = 0;i < flowers.length;i++) {
+          flowers[i]._timeAdjust += diff;
+        }
+      }
+    }
+    this.start(sz.fireworks.animation);
+  };
 
-      fw.mainCanvas.css({
-        'z-index': '1',
-        'position': 'absolute',
-        'left': '0',
-        'top': '0'
-      });
+  sz.fireworks.load = function() {
+    var $bg = jQuery('#bg'),
+      w = $bg.width(),
+      h = $bg.outerHeight(),
+      fw = sz.fireworks;
 
-      fw.mainCanvas.attach().animate(fw.animation);
+    fw.mainCanvas = new fw.FireworkCanvas({
+      'width': w,
+      'height': h,
+      'cssWidth': $bg.css('width'),
+      'cssHeight': $bg.css('height'),
+      'parent': '#bg',
+      'szParent': '#bg',
+      'runAnimation': true
+    });
 
-      // resize canvas to match screen
-      jQuery(document).ready(function() {
-        var cvs = sz.fireworks.mainCanvas;
+    fw.mainCanvas.css({
+      'z-index': '1',
+      'position': 'absolute',
+      'left': '0',
+      'top': '0'
+    });
 
-        if( cvs !== undefined ) {
-          jQuery(window, '#bg').on('resize', {
+    fw.mainCanvas.attach().animate(fw.animation);
+
+    // resize canvas to match screen
+    jQuery(document).ready(function() {
+      var cvs = sz.fireworks.mainCanvas;
+
+      if( cvs !== undefined ) {
+        jQuery(window, '#bg').on(
+          'resize',
+          {
             'canvas': cvs
           },
-          cvs.onresize_func);
-        }
-      });
-    },
+          cvs.onresize_func
+        );
 
-    unload: function() {
-      var fw = sz.fireworks;
-
-      fw.mainCanvas.stop();
-      fw._flies.length = fw._flowers.length = 0;
-      fw.mainCanvas.remove();
-      fw.mainCanvas = undefined;
-    },
-
-    // initialize and run fireworks animation
-    // -- context - main canvas 2d context
-    animation: function() {
-      var fw = sz.fireworks;
-
-      // effectively a while loop with counter, i is used as an id
-      // fill/refill rocket array
-      for(var i = 0; fw._flies.length < fw._MAX_OBJECTS; i++) {
-        fw._flies.push(new fw.Fly(i));
+        // add event listener to make animation page visibility api aware
+        jQuery(document).on(
+          document.visibilityChangeEvent,
+          {
+            'canvas': cvs
+          },
+          cvs.handleVisibilityChange
+        );
       }
+    });
+  };
 
-      fw.mainCanvas.render(function(ctx) {
-        var i = 0, j = 0, k = 0,
-          fw = sz.fireworks,
-          rC = null,
-          rCW = 0,
-          rCH = 0,
-          flower = null,
-          p = null,
-          len = 0;
+  sz.fireworks.unload = function() {
+    var fw = sz.fireworks;
 
-        ctx.save();
+    fw.mainCanvas.stop();
 
-        // too many tiny objects and  blur, faster to clear whole buffer canvas
-        ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+    jQuery(document).off(
+      document.visibilityChangeEvent,
+      fw.mainCanvas.handleVisibilityChange
+    );
 
-        ctx.translate(0.5,0.5); // sub-pixel align
-
-        // update and render existing rockets
-        for(i = 0; i < fw._flies.length; i++) {
-          fw._flies[i]._animation(ctx);
-        }
-
-        // update and render flower bursts
-        for(i = 0; i < fw._flowers.length; i++) {
-          flower = fw._flowers[i];
-
-          flower._animation(ctx); // position change calculations
-
-          if(flower._remove) { // splice out of array
-            fw.rmFlower(flower.id);
-            i--; // yay looping through a non-static length array
-          }
-          else { // render
-            rC = flower.refCanvas.get2DContext().canvas;
-            rCW = rC.width;
-            rCH = rC.height;
-
-            // fade out flower
-            // cubic out:  t /= d; t--; return b - c*(t*t*t+1)
-            // t = flower.time, b = 1, c = t/d, d = flower.dissolveTime
-            var gA = flower.time/flower.dissolveTime - 1;
-            gA = 1 - flower.time/flower.dissolveTime*(Math.pow(gA,3)+1);
-            ctx.globalAlpha = gA;
-
-            for(j = 0;j < flower.particles.length;j++) {
-              p = flower.particles[j];
-              len = p.histX.length;
-
-              // draw tail
-              for(k = 0;k < len;k++) {
-                ctx.globalAlpha = gA*(k+1)/len; // linear fade
-                ctx.drawImage(rC, p.histX[k], p.histY[k], rCW, rCH);
-              }
-              ctx.globalAlpha = gA;
-              ctx.drawImage(rC, p.x, p.y, rCW, rCH); // current position
-            }
-          }
-        }
-        ctx.restore();
-      });
-    },
-
-    rmFlower: function(id) {
-      var fw = sz.fireworks;
-      // find object in array and splice out (garbage collect)
-      for(i = 0;i < fw._flowers.length;i++) {
-        if( fw._flowers[i].id === id ) {
-          fw._flowers.splice(i,1);
-          return;
-        }
-      }
-      if( console !== undefined ) {
-        console.log("Error: sz.Flower with id of " + id + " not found.");
-      }
-    },
-
-    // Object that displays rocket launch and travel.
-    // Triggers a 'flower' (burst) at end of path.
-    Fly: function(idx) {
-      this.flyId = idx;
-      this.animate = true;
-      this._reset();
-    },
-
-    // object that displays burst effect
-    Flower: function(pointX, pointY, colorIdx, id) {
-      this.animate = true;
-      this.id = id;
-      this.startX = pointX;
-      this.startY = pointY;
-      this.colorIdx = colorIdx;
-      this.particles = []; // x,y coords of each particle
-      this.typeIdx = 0;
-      this.hypeIdx = 0;
-      this._remove = false;
-      this.makeRefCanvas();
-      this._init();
+    for(var i = fw._flowers.length-1;i >= 0;i--) {
+      fw.rmFlower(fw._flowers[i].id);
     }
+    fw._flies.length = fw._flowers.length = 0;
+    fw.mainCanvas.remove();
+    fw.mainCanvas = undefined;
+  };
+
+  // initialize and run fireworks animation
+  // -- context - main canvas 2d context
+  sz.fireworks.animation = function() {
+    var fw = sz.fireworks;
+
+    if(!fw.mainCanvas._opts.runAnimation) {
+      return;
+    }
+
+    // effectively a while loop with counter, i is used as an id
+    // fill/refill rocket array
+    for(var i = 0; fw._flies.length < fw._MAX_OBJECTS; i++) {
+      fw._flies.push(new fw.Fly(i));
+    }
+
+    fw.mainCanvas.render(function(ctx) {
+      var i = 0, j = 0, k = 0,
+        fw = sz.fireworks,
+        rC = null,
+        rCW = 0,
+        rCH = 0,
+        flower = null,
+        p = null,
+        len = 0;
+
+      ctx.save();
+
+      // too many tiny objects and  blur, faster to clear whole buffer canvas
+      ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
+      ctx.translate(0.5,0.5); // sub-pixel align
+
+      // update and render existing rockets
+      for(i = 0; i < fw._flies.length; i++) {
+        fw._flies[i]._animation(ctx);
+      }
+
+      // update and render flower bursts
+      for(i = 0; i < fw._flowers.length; i++) {
+        flower = fw._flowers[i];
+
+        flower._animation(ctx); // position change calculations
+
+        if(flower._remove) { // splice out of array
+          fw.rmFlower(flower.id);
+          i--; // yay looping through a non-static length array
+        }
+        else { // render
+          rC = flower.refCanvas.get2DContext().canvas;
+          rCW = rC.width;
+          rCH = rC.height;
+
+          // fade out flower
+          // cubic out:  t /= d; t--; return b - c*(t*t*t+1)
+          // t = flower.time, b = 1, c = t/d, d = flower.dissolveTime
+          var gA = flower.time/flower.dissolveTime - 1;
+          gA = 1 - flower.time/flower.dissolveTime*(Math.pow(gA,3)+1);
+          ctx.globalAlpha = gA;
+
+          for(j = 0;j < flower.particles.length;j++) {
+            p = flower.particles[j];
+            len = p.histX.length;
+
+            // draw tail
+            for(k = 0;k < len;k++) {
+              ctx.globalAlpha = gA*(k+1)/len; // linear fade
+              ctx.drawImage(rC, p.histX[k], p.histY[k], rCW, rCH);
+            }
+            ctx.globalAlpha = gA;
+            ctx.drawImage(rC, p.x, p.y, rCW, rCH); // current position
+          }
+        }
+      }
+      ctx.restore();
+    });
+  };
+
+  sz.fireworks.rmFlower = function(id) {
+    var fw = sz.fireworks;
+    // find object in array and splice out (garbage collect)
+    for(i = 0;i < fw._flowers.length;i++) {
+      if( fw._flowers[i].id === id ) {
+        fw._flowers.splice(i,1);
+        return;
+      }
+    }
+    if( console !== undefined ) {
+      console.log("Error: sz.Flower with id of " + id + " not found.");
+    }
+  };
+
+  // Object that displays rocket launch and travel.
+  // Triggers a 'flower' (burst) at end of path.
+  sz.fireworks.Fly = function(idx) {
+    this.flyId = idx;
+    this.animate = true;
+    this._reset();
+  };
+
+  // object that displays burst effect
+  sz.fireworks.Flower = function(pointX, pointY, colorIdx, id) {
+    this.animate = true;
+    this.id = id;
+    this.startX = pointX;
+    this.startY = pointY;
+    this.colorIdx = colorIdx;
+    this.particles = []; // x,y coords of each particle
+    this.typeIdx = 0;
+    this.hypeIdx = 0;
+    this._remove = false;
+    this.makeRefCanvas();
+    this._init();
   };
 
   sz.fireworks.Flower.prototype.types = [ // adjustments to angle
@@ -306,6 +356,8 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
 
     this.speed = gRI(fw._MIN_BLOOM_SPEED, fw._MAX_BLOOM_SPEED);
     this.dissolveTime = gRI(fw._MIN_DISSOLVE_SPEED, fw._MAX_DISSOLVE_SPEED);
+
+    this._timeAdjust = 0;
     
     for(var i = 0;i < numParticles;i++) {
       this.particles[i] = {
@@ -358,7 +410,7 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
 
     if( this.animate ) {
       var len = this.particles.length;
-      this.time = (new Date()).getTime() - this.startTime;
+      this.time = (new Date()).getTime() - this.startTime - this._timeAdjust;
 
       if( this.time >= this.dissolveTime ) {
         this._remove = true;
@@ -521,6 +573,8 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
     var fw = sz.fireworks,
       canvasHeight = fw.mainCanvas.height();
 
+    this._timeAdjust = 0;
+
     this.x = this.startX = gRI(100, fw.mainCanvas.width() - 100);
     this.y = this.startY = canvasHeight;
 
@@ -553,7 +607,8 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
   sz.fireworks.Fly.prototype._animation = function(ctx) {
     if( this.animate ) {
 
-      this.time = (new Date()).getTime() - this.startTime;
+      this.time = (new Date()).getTime() - this.startTime -
+        this._timeAdjust;
       var new_y = this.startY - this.speed * this.time / 1000,
         new_x = this.x;
 //      new_x = this.x + (this.xCoefficient*(this.time/1000));
