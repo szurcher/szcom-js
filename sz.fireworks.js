@@ -78,6 +78,7 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
     ],
     mainCanvas: undefined,
     _frame: 0,
+    _idCounter: 0,
 
       // sub-class sz.Canvas so we can override restart
     FireworkCanvas: function(opts) {
@@ -182,10 +183,10 @@ License: BSD 2-Clause - http://opensource.org/licenses/BSD-2-Clause
       return;
     }
 
-    // effectively a while loop with counter, i is used as an id
     // fill/refill rocket array
-    for(var i = 0; fw._flies.length < fw._MAX_OBJECTS; i++) {
-      fw._flies.push(new fw.Fly(i));
+    for(var i = fw._flies.length; i < fw._MAX_OBJECTS; i++) {
+      fw._flies.push(new fw.Fly(fw._idCounter++));
+      fw._idCounter = fw._idCounter % fw._MAX_OBJECTS;
     }
 
     fw.mainCanvas.render(function(ctx) {
